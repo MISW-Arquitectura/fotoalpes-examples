@@ -122,7 +122,7 @@ curl -X POST http://localhost:5000/orders \
   -d '{"user":1,"product":1,"quantity":10}'
 ```
 
-También puede usar [Postman](https://www.postman.com/downloads/).
+También puede usar [Postman](https://www.postman.com/downloads/): en [POSTMAN.md](POSTMAN.md) está el paso a paso con capturas y todas las operaciones de las cuatro ramas.
 
 ## Descripción de los servicios
 
