@@ -133,7 +133,7 @@ Cuerpos de las peticiones:
 >
 > El usuario y el producto deben existir **en la base de datos del servicio de órdenes**, donde llegan por replicación asíncrona. Si crea una orden inmediatamente después de crear el usuario, puede recibir un 400: espere un momento y reintente.
 
-En `vm/README.md` está el paso a paso de Postman con capturas.
+En [POSTMAN.md](POSTMAN.md) está el paso a paso de Postman con capturas, incluido cómo enviar el token en la cabecera `Authorization`.
 
 ## Descripción de los componentes
 
