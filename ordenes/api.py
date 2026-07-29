@@ -35,7 +35,31 @@ class OrderListResource(Resource):
             q.enqueue(process_order, new_order.id)
             return order_schema.dump(new_order)
         else:
-            return {"error": "The product or the user dont exist"}, 400
+            # Si los otros servicios rechazan el token, el problema es de
+            # autenticacion y no de datos inexistentes. Distinguirlo evita un
+            # diagnostico equivocado. Flask-JWT-Extended responde 401 cuando
+            # falta el token y 422 cuando la firma no valida, que es lo que
+            # ocurre si los servicios no comparten el mismo JWT_SECRET_KEY.
+            if user.status_code in (401, 422) or product.status_code in (401, 422):
+                return {
+                    "error": "Los servicios de usuarios o productos rechazaron el token.",
+                    "sugerencia": "Verifique que todos los servicios usen el mismo "
+                                  "JWT_SECRET_KEY y que el token provenga de /jwt.",
+                }, 502
+
+            # Se indica cual de los dos falta: el mensaje generico anterior
+            # obligaba a adivinar.
+            faltantes = []
+            if user.status_code != 200:
+                faltantes.append("el usuario " + str(request.json['user']))
+            if product.status_code != 200:
+                faltantes.append("el producto " + str(request.json['product']))
+
+            return {
+                "error": "No existe " + " ni ".join(faltantes) + ".",
+                "sugerencia": "Cree primero el usuario y el producto, y use los ids "
+                              "que devuelven esas operaciones.",
+            }, 400
 
 
 class OrderResource(Resource):
