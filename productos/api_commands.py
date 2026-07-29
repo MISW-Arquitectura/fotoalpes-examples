@@ -1,11 +1,13 @@
-from base import app, api, ma, db, Product, product_schema, products_schema, q, Resource, Flask, request
+from base import app, api, ma, db, Product, product_schema, q, q_proyeccion, Resource, Flask, request
 from sender import send_product
 from putter import put_product
+from proyector import proyectar_producto
 
 
 class ProductListResource(Resource):
 
     def post(self):
+        # El lado de comandos escribe UNICAMENTE en el modelo de escritura.
         new_product = Product(
             name=request.json['name'],
             description=request.json['description'],
@@ -14,7 +16,12 @@ class ProductListResource(Resource):
         )
         db.session.add(new_product)
         db.session.commit()
+
+        # Replica hacia el servicio de ordenes.
         q.enqueue(send_product, product_schema.dump(new_product))
+        # Proyeccion hacia el modelo de lectura de este servicio (CQRS).
+        q_proyeccion.enqueue(proyectar_producto, new_product.id)
+
         return product_schema.dump(new_product)
 
 
@@ -31,7 +38,11 @@ class ProductResource(Resource):
         if 'stock' in request.json:
             product.stock = request.json['stock']
         db.session.commit()
+
         q.enqueue(put_product, product_schema.dump(product))
+        # Toda escritura encola su proyeccion: tambien las modificaciones.
+        q_proyeccion.enqueue(proyectar_producto, product.id)
+
         return product_schema.dump(product)
 
 

@@ -89,26 +89,45 @@ services:
       redis:
         condition: service_healthy
 
-  # worker-orders atiende la db 0 de redis: procesa las ordenes y replica en la
-  # BD de ordenes los usuarios y productos creados por los otros servicios.
+  # worker-orders atiende la db 0 de redis: procesa las ordenes, replica en la
+  # BD de ordenes los usuarios y productos creados por los otros servicios, y
+  # proyecta las ordenes hacia el modelo de lectura.
   worker-orders:
     build: ./ordenes
     volumes:
       - ./ordenes/:/mnt/
     working_dir: /backend/
     command: rq worker -u 'redis://redis/0'
+    environment:
+      RETRASO_PROYECCION: ${RETRASO_PROYECCION:-0}
     depends_on:
       redis:
         condition: service_healthy
 
   # worker-products atiende la db 1 de redis: descuenta el stock en la BD de
-  # productos cuando el servicio de ordenes lo solicita.
+  # productos y proyecta los productos hacia su modelo de lectura.
   worker-products:
     build: ./productos
     volumes:
       - ./productos/:/mnt/
     working_dir: /backend/
     command: rq worker -u 'redis://redis/1'
+    environment:
+      RETRASO_PROYECCION: ${RETRASO_PROYECCION:-0}
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # worker-users atiende la db 2 de redis: proyecta los usuarios hacia el
+  # modelo de lectura del propio servicio de usuarios.
+  worker-users:
+    build: ./usuarios
+    volumes:
+      - ./usuarios/:/mnt/
+    working_dir: /backend/
+    command: rq worker -u 'redis://redis/2'
+    environment:
+      RETRASO_PROYECCION: ${RETRASO_PROYECCION:-0}
     depends_on:
       redis:
         condition: service_healthy

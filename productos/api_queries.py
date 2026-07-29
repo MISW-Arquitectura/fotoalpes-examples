@@ -1,16 +1,17 @@
-from base import app, api, ma, db, Product, product_schema, products_schema, q, Resource, Flask, request
+from base import app, api, ma, db, ProductView, product_view_schema, products_view_schema, Resource, Flask, request
 
 
 class ProductListResource(Resource):
     def get(self):
-        products = db.session.scalars(db.select(Product)).all()
-        return products_schema.dump(products)
+        # El lado de consultas lee UNICAMENTE del modelo de lectura.
+        products = db.session.scalars(db.select(ProductView)).all()
+        return products_view_schema.dump(products)
 
 
 class ProductResource(Resource):
     def get(self, product_id):
-        product = db.get_or_404(Product, product_id)
-        return product_schema.dump(product)
+        product = db.get_or_404(ProductView, product_id)
+        return product_view_schema.dump(product)
 
 
 api.add_resource(ProductListResource, '/api-queries/products')

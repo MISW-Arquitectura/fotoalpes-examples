@@ -30,6 +30,47 @@ jobs:
       - name: Ejecutar la prueba de humo
         run: python3 smoke_test.py http://localhost:5000
 
+      # La proyeccion debe poder regenerarse desde el modelo de escritura sin
+      # perder informacion. Se reconstruye y se comprueba que las consultas
+      # siguen devolviendo lo mismo.
+      - name: Reconstruir las proyecciones y verificar que siguen consistentes
+        run: |
+          python3 - <<'PY' > /tmp/antes.json
+          import json, urllib.request
+          def g(r):
+              with urllib.request.urlopen("http://localhost:5000" + r) as x:
+                  return json.loads(x.read())
+          print(json.dumps({
+              "users": g("/api-queries/users"),
+              "products": g("/api-queries/products"),
+              "orders": g("/api-queries/orders"),
+          }, sort_keys=True))
+          PY
+
+          docker compose exec -T users-commands python reconstruir_proyeccion.py
+          docker compose exec -T products-commands python reconstruir_proyeccion.py
+          docker compose exec -T orders-commands python reconstruir_proyeccion.py
+
+          python3 - <<'PY'
+          import json, sys, urllib.request
+          def g(r):
+              with urllib.request.urlopen("http://localhost:5000" + r) as x:
+                  return json.loads(x.read())
+          despues = {
+              "users": g("/api-queries/users"),
+              "products": g("/api-queries/products"),
+              "orders": g("/api-queries/orders"),
+          }
+          antes = json.load(open("/tmp/antes.json"))
+          if not despues["orders"]:
+              sys.exit("La proyeccion de ordenes quedo vacia tras reconstruirla.")
+          if antes != despues:
+              print("ANTES: ", json.dumps(antes, sort_keys=True))
+              print("DESPUES:", json.dumps(despues, sort_keys=True))
+              sys.exit("La proyeccion reconstruida no coincide con la original.")
+          print("Las proyecciones reconstruidas son identicas a las originales.")
+          PY
+
       - name: Logs de los servicios (solo si algo fallo)
         if: failure()
         run: docker compose logs --no-color

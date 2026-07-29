@@ -1,16 +1,18 @@
-from base import app, api, ma, db, User, user_schema, users_schema, q, Resource, Flask, request
+from base import app, api, ma, db, UserView, user_view_schema, users_view_schema, Resource, Flask, request
 
 
 class UserListResource(Resource):
     def get(self):
-        users = db.session.scalars(db.select(User)).all()
-        return users_schema.dump(users)
+        # El lado de consultas lee UNICAMENTE del modelo de lectura. Nunca
+        # toca el de escritura: esa es la segregacion que da nombre a CQRS.
+        users = db.session.scalars(db.select(UserView)).all()
+        return users_view_schema.dump(users)
 
 
 class UserResource(Resource):
     def get(self, user_id):
-        user = db.get_or_404(User, user_id)
-        return user_schema.dump(user)
+        user = db.get_or_404(UserView, user_id)
+        return user_view_schema.dump(user)
 
 
 api.add_resource(UserListResource, '/api-queries/users')
