@@ -145,7 +145,7 @@ curl -X POST http://localhost:5000/api-commands/users \
   -d '{"username":"ana"}'
 ```
 
-También puede usar [Postman](https://www.postman.com/downloads/); en `vm/README.md` está el paso a paso con capturas.
+También puede usar [Postman](https://www.postman.com/downloads/): en [POSTMAN.md](POSTMAN.md) está el paso a paso con capturas y todas las operaciones de las cuatro ramas.
 
 ## Descripción de los servicios
 
