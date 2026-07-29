@@ -1,12 +1,17 @@
-# fotoalpes-microservices-examples
+# fotoalpes-microservices-examples — máquina virtual (VirtualBox)
+
+> **Documento heredado.** La forma recomendada de correr el ejemplo es con Docker directamente en su máquina: vea el [README principal](../README.md). Esta guía se conserva por el paso a paso de **Postman**, que sigue siendo útil.
+>
+> **Advertencia sobre la imagen de la VM:** el enlace de descarga apunta al OneDrive personal de un docente que ya no está en la universidad, y no se ha verificado que siga disponible. Si va a usar la VM en un curso, compruebe el enlace **antes** de compartirlo con los estudiantes y considere alojar la imagen en un espacio institucional.
 
 ## Instalación
 
-El ejemplo del caso Foto Alpes es un proyecto en Flask que implementa microservicios y las tácticas vistas en el curso Aritecturas ágiles de software. El presente repositorio contiene el código del ejemplo en diferentes ramas de acuerdo a los temas vistos. Las ramas del proyecto son:
+El ejemplo del caso Foto Alpes es un proyecto en Flask que implementa microservicios y las tácticas vistas en el curso Arquitecturas ágiles de software. El presente repositorio contiene el código del ejemplo en diferentes ramas de acuerdo a los temas vistos. Las ramas del proyecto son:
 
 - main: Rama que implementa CQRS y comunicación asíncrona
 - sync: Rama que implementa comunicación síncrona
-- security: Rama que implementa el uso de tokens y certificados de seguridad
+- sync-sec: Rama que implementa el uso de tokens y certificados de seguridad con comunicación síncrona
+- async-sec: Rama que implementa el uso de tokens y certificados de seguridad con comunicación asíncrona
 
 Para ejecutar el proyecto es necesario instalar [Oracle VirtualBox](https://www.virtualbox.org/wiki/Downloads) en un pc local. Una vez instalado, se debe descargar la imagen de la máquina virtual ([MISW4202-FotoAlpes-Microservicios.zip](https://uniandes-my.sharepoint.com/:u:/g/personal/ci_cortesg_uniandes_edu_co/EQMbaoWx1yZOl5cMyrQ-8rgBqzCjd4HWqfLmfYs1vbWFZQ?e=16NHt7)) e importarla en Virtualbox. Para importar la imagen se deben seguir los siguientes pasos:
 
@@ -16,21 +21,21 @@ Para ejecutar el proyecto es necesario instalar [Oracle VirtualBox](https://www.
 
 3. Abrir Oracle Virtualbox e ir al menú Máquina --> Añadir
 
-   <img src="https://github.com/ci-cortesg/fotoalpes-microservices-examples/blob/main/img/Agregar_VM.png" alt="Agregar_VM" style="zoom:75%;" />
+   <img src="../img/Agregar_VM.png" alt="Agregar_VM" style="zoom:75%;" />
 
 4. Ubicar la carpeta donde se descomprimió el archivo zip y seleccionar el archivo MISW4202-FotoAlpes-Microservicios-New.ovdx
 
-   <img src="https://github.com/ci-cortesg/fotoalpes-microservices-examples/blob/main/img/Seleccionar_Archivo_VM.png" alt="Seleccionar_Archivo_VM" style="zoom:75%;" />
+   <img src="../img/Seleccionar_Archivo_VM.png" alt="Seleccionar_Archivo_VM" style="zoom:75%;" />
 
 5. En el menú izquierdo debe aparecer la máquina con el nombre del archivo seleccionado
 
 6. Dar clic en el botón Iniciar ubicado en la parte superior
 
-   <img src="https://github.com/ci-cortesg/fotoalpes-microservices-examples/blob/main/img/Iniciar_VM.png" alt="Iniciar_VM" style="zoom:75%;" />
+   <img src="../img/Iniciar_VM.png" alt="Iniciar_VM" style="zoom:75%;" />
 
 7. Una vez la máquina termine de cargar, debe visualizar la pantalla de inicio
 
-   <img src="https://github.com/ci-cortesg/fotoalpes-microservices-examples/blob/main/img/Pantalla_Inicio_VM.png" alt="Pantalla_Inicio_VM" style="zoom:75%;" />
+   <img src="../img/Pantalla_Inicio_VM.png" alt="Pantalla_Inicio_VM" style="zoom:75%;" />
 
 8. Ingresar con el usuario **estudiante** y la contraseña **Estudiante2021**
 
@@ -42,7 +47,7 @@ Para ejecutar el proyecto es necesario instalar [Oracle VirtualBox](https://www.
 
 10. Tomar nota de la dirección ip que se despliega en pantalla, como aparece en la siguiente imagen:
 
-    <img src="https://github.com/ci-cortesg/fotoalpes-microservices-examples/blob/main/img/Direccion_IP_VM.png" alt="Direccion_IP_VM" style="zoom:75%;" />
+    <img src="../img/Direccion_IP_VM.png" alt="Direccion_IP_VM" style="zoom:75%;" />
 
 11. La dirección IP obtenida en el paso anterior corresponde a la dirección asociada al adaptador de red de la máquina virtual. Tome nota de esta dirección porque se utilizará para acceder a los servicios desde su pc local
 
@@ -55,7 +60,7 @@ Para ejecutar el proyecto es necesario instalar [Oracle VirtualBox](https://www.
 13. Para ejecutar los servicios, corra el siguiente comando:
 
     ```
-    sudo docker-compose up
+    sudo docker compose up
     ```
 
     
@@ -72,7 +77,7 @@ Una vez haya descargado e instalado Postman, ejecute este programa siga los sigu
 
 3. En el campo Name ingrese el nombre para el conjunto de pruebas o servicios, por ejemplo Ejemplo FotoAlpes. Luego haga clic en el botón Create
 
-   <img src="https://github.com/ci-cortesg/fotoalpes-microservices-examples/blob/main/img/Crear_Coleccion.png" alt="Crear_Coleccion" style="zoom:75%;" />
+   <img src="../img/Crear_Coleccion.png" alt="Crear_Coleccion" style="zoom:75%;" />
 
 4. Nuevamente haga clic en el botón New
 
@@ -84,7 +89,7 @@ Una vez haya descargado e instalado Postman, ejecute este programa siga los sigu
 
 8. Haga clic el el botón Save to ....
 
-   <img src="https://github.com/ci-cortesg/fotoalpes-microservices-examples/blob/main/img/Crear_Request.png" alt="Crear_Request" style="zoom:75%;" />
+   <img src="../img/Crear_Request.png" alt="Crear_Request" style="zoom:75%;" />
 
 9. Dependiendo del servicio a probar seleccione el método requerido. Para las operaciones de consulta, el método es Get. Para las operaciones de creación el método es Post y para las operaciones de modificación el método es Put. El ejemplo no implementa ningún otro tipo de operaciones.
 
@@ -94,10 +99,10 @@ Una vez haya descargado e instalado Postman, ejecute este programa siga los sigu
 
 12. En la opción Body de la respuesta recibida se puede ver la información que retorna el servicio
 
-    <img src="https://github.com/ci-cortesg/fotoalpes-microservices-examples/blob/main/img/Listar_Usuarios.png" alt="Listar_Usuarios" style="zoom:75%;" />
+    <img src="../img/Listar_Usuarios.png" alt="Listar_Usuarios" style="zoom:75%;" />
 
 
 
 Para el caso de las operaciones que usan los métodos Post y Put se debe especificar la información requerida por el servicio. Esta información se debe definir en formato Json en la opción Body del Request. La siguiente imagen muestra la definición de los datos para crear un nuevo usuario:
 
-<img src="https://github.com/ci-cortesg/fotoalpes-microservices-examples/blob/main/img/Crear_Usuario.png" alt="Crear_Usuario" style="zoom:75%;" />
+<img src="../img/Crear_Usuario.png" alt="Crear_Usuario" style="zoom:75%;" />

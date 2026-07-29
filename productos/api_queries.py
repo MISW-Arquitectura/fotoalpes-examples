@@ -1,19 +1,18 @@
 from base import app, api, ma, db, Product, product_schema, products_schema, q, Resource, Flask, request
-from sender import send_product
 from flask_jwt_extended import jwt_required
-
 
 
 class ProductListResource(Resource):
     @jwt_required()
     def get(self):
-        products = Product.query.all()
+        products = db.session.scalars(db.select(Product)).all()
         return products_schema.dump(products)
+
 
 class ProductResource(Resource):
     @jwt_required()
     def get(self, product_id):
-        product = Product.query.get_or_404(product_id)
+        product = db.get_or_404(Product, product_id)
         return product_schema.dump(product)
 
 

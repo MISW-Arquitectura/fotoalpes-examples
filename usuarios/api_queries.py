@@ -1,20 +1,19 @@
 from base import app, api, ma, db, User, user_schema, users_schema, q, Resource, Flask, request
-from sender import send_user
 from flask_jwt_extended import jwt_required
+
 
 class UserListResource(Resource):
     @jwt_required()
     def get(self):
-        posts = User.query.all()
-        return users_schema.dump(posts)
+        users = db.session.scalars(db.select(User)).all()
+        return users_schema.dump(users)
 
 
 class UserResource(Resource):
     @jwt_required()
     def get(self, user_id):
-        user = User.query.get_or_404(user_id)
+        user = db.get_or_404(User, user_id)
         return user_schema.dump(user)
-
 
 
 api.add_resource(UserListResource, '/api-queries/users')

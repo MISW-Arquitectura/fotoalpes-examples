@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [async-sec]
+  pull_request:
+    branches: [async-sec]
+  # Corrida mensual: detecta que el ejemplo dejo de funcionar por el paso del
+  # tiempo (imagenes base, dependencias, certificados) antes de que empiece el
+  # semestre.
+  schedule:
+    - cron: '0 6 1 * *'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    name: Prueba de humo end-to-end
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Verificar que el certificado no este vencido
+        run: openssl x509 -in nginx/localhost.crt -noout -checkend 0 -subject -dates
+
+      - name: Construir y levantar los servicios
+        run: docker compose up -d --build --wait
+
+      - name: Estado de los contenedores
+        run: docker compose ps
+
+      - name: Ejecutar la prueba de humo
+        run: python3 smoke_test.py https://localhost:5000
+
+      - name: Logs de los servicios (solo si algo fallo)
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Bajar los servicios
+        if: always()
+        run: docker compose down -v

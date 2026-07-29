@@ -2,20 +2,18 @@ from base import app, api, ma, db, Order, order_schema, orders_schema, q, proces
 from flask_jwt_extended import jwt_required
 
 
-
 class OrderListResource(Resource):
     @jwt_required()
     def get(self):
-        orders = Order.query.all()
+        orders = db.session.scalars(db.select(Order)).all()
         return orders_schema.dump(orders)
 
 
 class OrderResource(Resource):
     @jwt_required()
     def get(self, order_id):
-        order = Order.query.get_or_404(order_id)
+        order = db.get_or_404(Order, order_id)
         return order_schema.dump(order)
-
 
 
 api.add_resource(OrderListResource, '/api-queries/orders')

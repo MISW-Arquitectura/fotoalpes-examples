@@ -1,82 +1,147 @@
-# fotoalpes-microservices-examples - main
+# fotoalpes-examples — rama `async-sec`
 
-## Instalación
+Ejemplo resuelto del caso **Foto Alpes** para el curso de Arquitecturas Ágiles de Software (MISW). Esta rama combina todo: patrón **CQRS**, **comunicación asíncrona** con Redis, **TLS** entre todos los componentes, **autenticación con tokens JWT** y un componente **ACL** que autoriza qué cola puede usar cada servicio.
 
-Si usted descargó la imagen de la máquina virtual para Virtual Box omita esta sección y pase a la sección Ejecución. LLos servicios de este ejemplo requieren de *flask*, *redis*, *docker* y *docker-compose*. Se debe clonar este repositorio y, en caso de usar Linux Ubuntu ejecutar el archivo install.sh para instalar las librerías y los servicios. Después de ejecutar el archivo se debe reiniciar la máquina virtual. Si usa un sistema operativo distinto, debe instalar las librerías requeridas de manera manual.
+## Ramas del proyecto
 
-```
-sh install.sh
-```
+| Rama | Contenido |
+|---|---|
+| `main` | CQRS y comunicación asíncrona |
+| `sync` | Comunicación síncrona |
+| `sync-sec` | Tokens JWT y certificados, con comunicación síncrona |
+| `async-sec` | Tokens JWT y certificados, con comunicación asíncrona |
+
+## Requisitos
+
+Solo necesita **Docker** con **Compose v2**.
+
+- **macOS / Windows:** instale [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+- **Ubuntu / Debian:** ejecute `sh install.sh` y luego cierre y reabra la sesión.
+
+Verifique con `docker compose version`.
 
 ## Ejecución
 
-Para correr la aplicación se debe ejecutar el siguiente comando:
-
-
-```
-docker-compose up
+```sh
+docker compose up -d --build --wait
 ```
 
-O si prefiere correr la aplicación en background se debe ejecutar el siguiente comando:
+Los servicios quedan expuestos a través del API Gateway en **https://localhost:5000** (note el **https**).
 
-```
-docker-compose up -d
-```
+Para detener todo y borrar los datos:
 
-
-
-## Descripción de los servicios
-
-Esta rama (async-sec) muestra la comunicación entre servicios de manera asíncrona e implementa el patrón CQRS. Para la comunicación asíncrona se utiliza Redis como plataforma de mensajería. Para la seguridad se utiliza un certificado SSL para asegurar la comunicación entre los servicios y se implementa un componente encargado de la gestión de tokens para autenticar el llamado de los servicios expuestos. Finalmente se implementa un componente que valida que los servicios tengan permisos de usar las colas definidas en la plataforma de mensajería.
-
-El ejemplo implementa cinco servicios:
-
-#### Ordenes
-
-Al implemetar el patrón CQRS las operaciones que expone este servicio se implementan en dos partes:   comandos (api_commands.py) y consultas (api_queries.py). En el archivo api_comands se tienen las siguientes operaciones:
-
-- Crear una nueva orden: Esta operación se implementa en la función OrderListResource a través del método post.
-
-Se puede observar que una vez creada la orden se coloca en la cola el id de la orden para que esta sea procesada.
-
-```python
-# add to queue to process order
-q.enqueue(process_order, new_order.id)
+```sh
+docker compose down -v
 ```
 
-En el archivo api_queries se tienen las siguientes operaciones:
+## Certificados
 
-- Listar todas las órdenes: Esta operación se implementa en la función OrderListResource a través del método get.
-- Consultar una orden específica: Esta operación se implementa en la función OrderResource a través del método get.
+El API Gateway usa un certificado **autofirmado** versionado en `nginx/`. Su navegador y Postman mostrarán una advertencia de certificado no confiable: es lo esperado.
 
-#### Productos
+> **Estos son certificados de prueba.** La llave privada está en el repositorio a propósito para que el ejemplo funcione sin pasos adicionales. Nunca los use fuera del aula.
 
-Al implemetar el patrón CQRS las operaciones que expone este servicio se implementan en dos partes:   comandos (api_commands.py) y consultas (api_queries.py). En el archivo api_comands se tienen las siguientes operaciones:
+En Postman debe desactivar la verificación de certificados: **File → Settings → SSL certificate verification → Off**.
 
-- Crear un nuevo producto: Esta operación se implementa en la función ProductListResource a través del método post.
-- Modificar un producto: Esta operación se implementa en la función ProductResource a través del método put.
+El certificado actual vence en **2046**. Para regenerarlo:
 
-En el archivo api_queries se tienen las siguientes operaciones:
+```sh
+sh nginx/generar_certificados.sh
+docker compose up -d --build --wait
+```
 
-- Listar todos los productos: Esta operación se implementa en la función ProductListResource a través del método get.
-- Consultar un producto específico: Esta operación se implementa en la función ProductResource a través del método get.
+> Los certificados originales de este ejemplo vencieron en mayo de 2024 y hacían fallar la rama completa. El CI ahora verifica la vigencia en cada corrida.
 
-#### Usuarios
+## Autenticación
 
-Al implemetar el patrón CQRS las operaciones que expone este servicio se implementan en dos partes:   comandos (api_commands.py) y consultas (api_queries.py). En el archivo api_comands se tienen las siguientes operaciones:
+**Todos los servicios exigen un token JWT.** Primero pida un token al componente `jwt`:
 
-- Crear un nuevo usuario: Esta operación se implementa en la función UserListResource a través del método post.
+```sh
+curl -k https://localhost:5000/api-queries/jwt
+```
 
-En el archivo api_queries se tienen las siguientes operaciones:
+Y envíelo en la cabecera `Authorization` de las demás peticiones:
 
-- Listar todos los usuarios: Esta operación se implementa en la función UserListResource a través del método get.
-- Consultar un usuario específico: Esta operación se implementa en la función UserResource a través del método get.
+```sh
+curl -k https://localhost:5000/api-queries/users \
+  -H "Authorization: Bearer <token>"
+```
 
-#### Jwt
+Sin token, los servicios responden **401**.
 
-Este servicio se encarga de gestionar los tokens que deben ser utilizados por los demás servicios y expone una sola operación:
+## Verificar que todo funciona
 
-- Crear token: Esta operación se implementa en la función AuthResource a través del método get, la cual retorna un token el cual se debe incluir en el llamado de cualquiera de los otros servicios descritos anteriormente. Se puede observar que antes de la definición de cada función en todos los servicios, se especifica una instrucción (@jwt_required) que obliga a la validación del token generado por la operación Crear token:
+Con los servicios corriendo:
+
+```sh
+python3 smoke_test.py
+```
+
+La prueba recorre el camino completo: obtiene un token, comprueba que sin token la respuesta es 401, crea usuario y producto, espera a que el worker los replique en la base de datos del servicio de órdenes, crea una orden, verifica que el procesamiento asíncrono la marcó como `completed` y descontó el stock, y finalmente modifica el producto para comprobar que la réplica se actualiza.
+
+Si prefiere no depender de Python en su máquina:
+
+```sh
+docker run --rm --network fotoalpes-examples_default \
+  -v "$PWD/smoke_test.py:/smoke_test.py:ro" \
+  fotoalpes-examples-users-commands python /smoke_test.py https://nginx:443
+```
+
+## Endpoints
+
+Todas las rutas pasan por el API Gateway en `https://localhost:5000` y **requieren token**, excepto `/api-queries/jwt`.
+
+| Componente | Operación | Método | Ruta |
+|---|---|---|---|
+| Jwt | Obtener token (**sin** token) | GET | `/api-queries/jwt` |
+| Usuarios | Crear usuario | POST | `/api-commands/users` |
+| Usuarios | Listar usuarios | GET | `/api-queries/users` |
+| Usuarios | Consultar usuario | GET | `/api-queries/users/<id>` |
+| Productos | Crear producto | POST | `/api-commands/products` |
+| Productos | Modificar producto | PUT | `/api-commands/products/<id>` |
+| Productos | Listar productos | GET | `/api-queries/products` |
+| Productos | Consultar producto | GET | `/api-queries/products/<id>` |
+| Órdenes | Crear orden | POST | `/api-commands/orders` |
+| Órdenes | Listar órdenes | GET | `/api-queries/orders` |
+| Órdenes | Consultar orden | GET | `/api-queries/orders/<id>` |
+
+> El componente **ACL no se publica** por el gateway: solo lo consultan los servicios entre sí dentro de la red de Docker.
+
+Cuerpos de las peticiones:
+
+```json
+{ "username": "nombre_del_usuario" }
+```
+
+```json
+{
+  "name": "Nombre del producto",
+  "description": "Descripción del producto",
+  "value": 1500,
+  "stock": 100
+}
+```
+
+```json
+{
+  "user": 1,
+  "product": 1,
+  "quantity": 10
+}
+```
+
+> La orden se crea en estado `processing` y un worker la procesa. Consúltela unos segundos después para verla en `completed` o `failed`.
+>
+> El usuario y el producto deben existir **en la base de datos del servicio de órdenes**, donde llegan por replicación asíncrona. Si crea una orden inmediatamente después de crear el usuario, puede recibir un 400: espere un momento y reintente.
+
+En `vm/README.md` está el paso a paso de Postman con capturas.
+
+## Descripción de los componentes
+
+Al implementar CQRS, cada servicio de negocio expone sus operaciones en dos partes: comandos (`api_commands.py`) y consultas (`api_queries.py`), y cada parte corre en su propio contenedor.
+
+### Jwt
+
+Expone una sola operación (`jwt/api.py`): **crear token** (`AuthResource.get`). En cada operación de los demás servicios se declara `@jwt_required()`, que obliga a validar ese token:
 
 ```python
 class OrderListResource(Resource):
@@ -84,86 +149,115 @@ class OrderListResource(Resource):
     def get(self):
 ```
 
-#### Acl
+### ACL
 
-Este servicio se encarga de validar que el servicio que intenta escribir en una cola de mensajería tenga los permisos para hacerlo. Expone una sola operación:
-
-- Validar permiso: Esta operación se implementa en la función AclResource a través del método get.
-
-#### API Gateway
-
-En este ejemplo se utiliza la configuración proxy del servidor Ngnix para implementar el componente API Gateway. Esta configuración permite que todas las solicitudes se hagan al servidor Ngnix y este redireccione al servicio correspondiente de acuerdo a la operación y ruta especificada en el url, por ejemplo http://localhost/api-commands/users:
-
-```
-location /api-commands/users {
-  proxy_pass http://users-commands:5000;
-  proxy_set_header X-Real-IP  $remote_addr;
-  proxy_set_header X-Forwarded-For $remote_addr;
-  proxy_set_header Host $host;
-}
-location /api-commands/products {
-  proxy_pass http://products-commands:5000;
-  proxy_set_header X-Real-IP  $remote_addr;
-  proxy_set_header X-Forwarded-For $remote_addr;
-  proxy_set_header Host $host;
-}
-location /api-commands/orders {
-  proxy_pass http://orders-commands:5000;
-  proxy_set_header X-Real-IP  $remote_addr;
-  proxy_set_header X-Forwarded-For $remote_addr;
-  proxy_set_header Host $host;
-}
-location /api-queries/users {
-  proxy_pass http://users-queries:5000;
-  proxy_set_header X-Real-IP  $remote_addr;
-  proxy_set_header X-Forwarded-For $remote_addr;
-  proxy_set_header Host $host;
-}
-location /api-queries/products {
-  proxy_pass http://products-queries:5000;
-  proxy_set_header X-Real-IP  $remote_addr;
-  proxy_set_header X-Forwarded-For $remote_addr;
-  proxy_set_header Host $host;
-}
-location /api-queries/orders {
-  proxy_pass http://orders-queries:5000;
-  proxy_set_header X-Real-IP  $remote_addr;
-  proxy_set_header X-Forwarded-For $remote_addr;
-  proxy_set_header Host $host;
-}
-```
-Adicionalmente se configura el servidor Ngnix para utilizar un certificado SSL autogenerado para cifrar la información que fluye entre los servicios y entre el usuario y el servidor Nginx, por lo que ahora se utiliza el protocolo https a diferencia de la rama sync en donde se utiliza el protocolo http.
-
-#### Comunicación asíncrona
-
-En esta rama, cada servicio tene una copia de la estructura de la BD de los demás servicios por lo que se debe actualizar la información en cada BD cuando se hace una actualización en alguno de los servicios. Por lo anterior, cada servicio usa la cola de mensajería para notificar a los demás los cambios realizados en su respectiva BD o para actualizar la BD con los cambios realizados por los otros servicios. A continuación se muestra el esquema descrito anteriormente para el servicio Productos:
-
-###### Notificar cambios
-
-En el archivo api_commands.py, el cual implementa las operaciones de creación y actualización de productos, se publica en la cola el id del producto creado o modificado para que los demás servicios actualicen su respectiva BD.
+Valida que un servicio tenga permiso de usar una cola de mensajería (`acl/api.py`). Cada servicio lo consulta **al arrancar** para saber qué base de datos de Redis puede usar:
 
 ```python
-#Publicación en la cola en la creación de un producto
-def post(self):
-    ...
-	q.enqueue(send_product, product_schema.dump(new_product))
-#Publicación en la cola en la creación de un producto
-def put(self):
-    ...
-	q.enqueue(put_product, product_schema.dump(product))
+q = Queue(connection=Redis(host='redis', port=6379, db=obtener_cola("orders", "q")))
 ```
 
-El archivo sender.py publica en la cola el id de un nuevo producto. El archivo putter.py publica en la cola el id del producto modificado.
+Las autorizaciones se cargan en `acl/build_database.py`:
 
-###### Actualizar cambios
+| Servicio | Cola | Valor (db de Redis) |
+|---|---|---|
+| `orders` | `q` | 0 |
+| `orders` | `q2` | 1 |
+| `products` | `q` | 0 |
+| `users` | `q` | 0 |
 
-Para el ejemplo, la actualización de un producto se realiza por parte del servicio de órdenes, el cual modifica la cantidad en stock del producto. Por lo anterior, el archivo updater.py implementa la actualización del producto cuyo id publica el servicio de órdenes en la cola. En la carpeta ordenes, en el archivo base.py se define la función process_order la cual verifica que el producto sea válido y si es así cambia el estado de la orden y publica en la cola el id del producto incluído en la orden.
+> Esa consulta ocurre al importar el módulo. Si `jwt` o `acl` aún no responden, el contenedor moriría al arrancar, por lo que `obtener_cola()` reintenta y el `docker-compose.yaml` declara la dependencia con `condition: service_healthy`.
+
+### Órdenes
+
+En `api_commands.py`: **crear una nueva orden**. Una vez creada se encola su id para procesarla:
+
+```python
+# add to queue to process order
+q.enqueue(process_order, new_order.id)
+```
+
+En `api_queries.py`: **listar todas las órdenes** y **consultar una orden específica**.
+
+### Productos
+
+En `api_commands.py`: **crear** y **modificar** un producto. En `api_queries.py`: **listar** y **consultar**.
+
+### Usuarios
+
+En `api_commands.py`: **crear un nuevo usuario**. En `api_queries.py`: **listar** y **consultar**.
+
+### API Gateway
+
+nginx recibe todo el tráfico en HTTPS y lo redirige al servicio correspondiente según la operación y la ruta, también por HTTPS:
+
+```
+listen 443 ssl;
+http2 on;
+ssl_protocols TLSv1.2 TLSv1.3;
+
+location /api-commands/users {
+  proxy_pass https://users-commands:5000;
+  ...
+}
+location /api-queries/users {
+  proxy_pass https://users-queries:5000;
+  ...
+}
+```
+
+La configuración completa está en `nginx/nginx-proxy.conf`.
+
+## Comunicación asíncrona
+
+Cada servicio tiene una copia de la estructura de la base de datos de los demás, por lo que hay que propagar los cambios cuando alguno actualiza su información. Para eso se usan **dos colas de Redis**, atendidas por dos workers distintos:
+
+| Cola | Worker | Corre en | Responsabilidad |
+|---|---|---|---|
+| db `0` | `worker-orders` | contenedor de `ordenes` | Procesa órdenes y replica usuarios y productos en la BD de órdenes |
+| db `1` | `worker-products` | contenedor de `productos` | Descuenta el stock en la BD de productos |
+
+### Notificar cambios
+
+En `api_commands.py` se publica en la cola la información del producto creado o modificado:
+
+```python
+# Publicación en la cola en la creación de un producto
+def post(self):
+    ...
+    q.enqueue(send_product, product_schema.dump(new_product))
+
+# Publicación en la cola en la modificación de un producto
+def put(self):
+    ...
+    q.enqueue(put_product, product_schema.dump(product))
+```
+
+`sender.py` publica el producto nuevo y `putter.py` el producto modificado.
+
+### Actualizar cambios
+
+La actualización del stock la solicita el servicio de órdenes. En `ordenes/base.py`, `process_order` verifica las existencias, cambia el estado de la orden y publica en la segunda cola la cantidad a descontar:
 
 ```python
 def process_order(order_id):
-	...
-	q2.enqueue(update_product, {
-		'id': product.id,
-		'quantity': order.quantity
-	})
+    ...
+    q2.enqueue(update_product, {
+        'id': product.id,
+        'quantity': order.quantity
+    })
 ```
+
+`productos/updater.py` implementa el descuento real.
+
+> **Detalle importante para entender el ejemplo:** `ordenes/base.py` importa un `update_product` local que no hace nada (`ordenes/updater.py`). Ese *stub* existe solo para poder encolar la referencia: RQ la serializa como `updater.update_product` y quien la ejecuta es `worker-products`, que resuelve ese nombre contra `productos/updater.py`. Lo mismo ocurre con `sender.py` y `putter.py` en los otros servicios. Es decir, **la función que se importa no es la que se ejecuta**.
+
+## Notas de mantenimiento
+
+- **Todas las versiones están fijadas**, incluidas las imágenes de Redis y nginx. Sin eso el ejemplo deja de compilar solo con que pase el tiempo.
+- Las llamadas entre servicios usan `verify=False` porque los certificados son autofirmados. **Es aceptable solo en este ejemplo**; en un sistema real habría que validar la cadena de certificación.
+- La configuración de nginx ya no acepta TLS 1.0 ni 1.1: están obsoletos y las versiones actuales de nginx y OpenSSL los rechazan.
+- `Flask-JWT-Extended` usa `JWT_SECRET_KEY = "secret-jwt"` y tokens que **no expiran** (`JWT_ACCESS_TOKEN_EXPIRES = False`). Ambas cosas son deliberadas para simplificar el ejemplo y ambas serían graves en producción.
+- El `docker-compose.yaml` **no define política de `restart`** a propósito: si un servicio falla, debe quedar caído y visible en `docker compose ps`.
+- Las bases de datos son SQLite en archivo, compartidas por bind mount entre el contenedor de comandos y el de consultas de cada servicio. Suficiente para el ejemplo, no apto para producción.
+- Los servicios corren con el servidor de desarrollo de Flask y certificados `adhoc`. Adecuado para el aula, no para despliegues reales.

@@ -1,99 +1,151 @@
-version: "3.2"
+# Nota: no se define 'restart' a proposito. Si un servicio falla queremos que
+# quede caido y visible en 'docker compose ps', no que se reinicie en bucle
+# ocultando el error.
+
+x-healthcheck-puerto: &healthcheck-puerto
+  test: ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 5000), timeout=2)"]
+  interval: 5s
+  timeout: 3s
+  retries: 10
+  start_period: 5s
+
+# Todos los servicios de negocio consultan al componente jwt y al ACL cuando
+# arrancan, por lo que dependen de que ambos esten saludables.
+x-depende-de-seguridad: &depende-de-seguridad
+  redis:
+    condition: service_healthy
+  jwt-queries:
+    condition: service_healthy
+  acl-queries:
+    condition: service_healthy
+
 services:
   redis:
-    image: redis
-    volumes: 
-      - ./data:/data
-  acl-queries:
+    image: redis:8.2-alpine
+    # Volumen nombrado en vez de bind mount a ./data: la cola es efimera y
+    # persistirla en el repo provocaba que un dump.rdb viejo impidiera
+    # arrancar al cambiar de version de redis. Se limpia con 'down -v'.
     volumes:
-        - ./acl/:/mnt/
-    build: ./acl
-    working_dir: /backend/
-    command: sh run.sh
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   jwt-queries:
-    volumes:
-        - ./jwt/:/mnt/
     build: ./jwt
+    volumes:
+      - ./jwt/:/mnt/
     working_dir: /backend/
     command: sh run.sh
+    healthcheck: *healthcheck-puerto
+
+  acl-queries:
+    build: ./acl
+    volumes:
+      - ./acl/:/mnt/
+    working_dir: /backend/
+    command: sh run.sh
+    healthcheck: *healthcheck-puerto
+
   users-commands:
-    volumes:
-        - ./usuarios/:/mnt/
     build: ./usuarios
+    volumes:
+      - ./usuarios/:/mnt/
     working_dir: /backend/
     command: sh run_commands.sh
-    depends_on: 
-      - redis
+    healthcheck: *healthcheck-puerto
+    depends_on: *depende-de-seguridad
+
   users-queries:
-    volumes:
-        - ./usuarios/:/mnt/
     build: ./usuarios
+    volumes:
+      - ./usuarios/:/mnt/
     working_dir: /backend/
     command: sh run_queries.sh
-    depends_on: 
-      - redis
+    healthcheck: *healthcheck-puerto
+    depends_on: *depende-de-seguridad
+
   products-commands:
-    volumes:
-        - ./productos/:/mnt/
     build: ./productos
-    working_dir: /backend/
-    command: sh run_commands.sh
-    depends_on: 
-      - redis
-  products-queries:
-    volumes:
-        - ./productos/:/mnt/
-    build: ./productos
-    working_dir: /backend/
-    command: sh run_queries.sh
-    depends_on: 
-      - redis
-  orders-commands:
-    volumes:
-        - ./ordenes/:/mnt/
-    build: ./ordenes
-    working_dir: /backend/
-    command: sh run_commands.sh
-    depends_on:
-      - redis
-  orders-queries:
-    volumes:
-        - ./ordenes/:/mnt/
-    build: ./ordenes
-    working_dir: /backend/
-    command: sh run_queries.sh
-    depends_on:
-      - redis
-  worker-orders:
-    volumes:
-      - ./ordenes/:/mnt/
-    build: ./ordenes
-    working_dir: /backend/
-    command: rq worker -u 'redis://redis/0'
-    depends_on:
-      - redis
-  worker-products:
     volumes:
       - ./productos/:/mnt/
+    working_dir: /backend/
+    command: sh run_commands.sh
+    healthcheck: *healthcheck-puerto
+    depends_on: *depende-de-seguridad
+
+  products-queries:
     build: ./productos
+    volumes:
+      - ./productos/:/mnt/
+    working_dir: /backend/
+    command: sh run_queries.sh
+    healthcheck: *healthcheck-puerto
+    depends_on: *depende-de-seguridad
+
+  orders-commands:
+    build: ./ordenes
+    volumes:
+      - ./ordenes/:/mnt/
+    working_dir: /backend/
+    command: sh run_commands.sh
+    healthcheck: *healthcheck-puerto
+    depends_on: *depende-de-seguridad
+
+  orders-queries:
+    build: ./ordenes
+    volumes:
+      - ./ordenes/:/mnt/
+    working_dir: /backend/
+    command: sh run_queries.sh
+    healthcheck: *healthcheck-puerto
+    depends_on: *depende-de-seguridad
+
+  # worker-orders atiende la cola 0: procesa las ordenes y replica en la BD de
+  # ordenes los usuarios y productos creados por los otros servicios.
+  worker-orders:
+    build: ./ordenes
+    volumes:
+      - ./ordenes/:/mnt/
+    working_dir: /backend/
+    command: rq worker -u 'redis://redis/0'
+    depends_on: *depende-de-seguridad
+
+  # worker-products atiende la cola 1: descuenta el stock en la BD de
+  # productos cuando el servicio de ordenes lo solicita.
+  worker-products:
+    build: ./productos
+    volumes:
+      - ./productos/:/mnt/
     working_dir: /backend/
     command: rq worker -u 'redis://redis/1'
-    depends_on:
-      - redis
+    depends_on: *depende-de-seguridad
 
   nginx:
-    image: nginx:latest
+    image: nginx:1.27-alpine
     ports:
       - 5000:443
     volumes:
-        - ./nginx/nginx-proxy.conf:/etc/nginx/conf.d/default.conf:ro
-        - ./nginx/localhost.crt:/etc/ssl/certs/localhost.crt
-        - ./nginx/localhost.key:/etc/ssl/private/localhost.key
+      - ./nginx/nginx-proxy.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/localhost.crt:/etc/ssl/certs/localhost.crt:ro
+      - ./nginx/localhost.key:/etc/ssl/private/localhost.key:ro
     depends_on:
-        - orders-commands
-        - orders-queries
-        - users-commands
-        - users-queries
-        - products-commands
-        - products-queries
-        - jwt-queries
+      orders-commands:
+        condition: service_healthy
+      orders-queries:
+        condition: service_healthy
+      users-commands:
+        condition: service_healthy
+      users-queries:
+        condition: service_healthy
+      products-commands:
+        condition: service_healthy
+      products-queries:
+        condition: service_healthy
+      jwt-queries:
+        condition: service_healthy
+
+volumes:
+  redis-data:

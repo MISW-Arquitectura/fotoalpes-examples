@@ -2,13 +2,11 @@ from base import app, api, ma, db, Order, User, Product, order_schema, orders_sc
 from flask_jwt_extended import jwt_required
 
 
-
-
 class OrderListResource(Resource):
     @jwt_required()
     def post(self):
-        user = User.query.get(request.json['user'])
-        product = Product.query.get(request.json['product'])
+        user = db.session.get(User, request.json['user'])
+        product = db.session.get(Product, request.json['product'])
         if user is not None and product is not None:
             new_order = Order(
                 user=request.json['user'],
@@ -23,8 +21,6 @@ class OrderListResource(Resource):
             return order_schema.dump(new_order)
         else:
             return {"error": "The product or the user dont exist"}, 400
-
-
 
 
 api.add_resource(OrderListResource, '/api-commands/orders')

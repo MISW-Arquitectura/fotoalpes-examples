@@ -18,23 +18,30 @@ api = Api(app)
 
 class ACL(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    # Numero de base de datos de redis que se autoriza para esta combinacion
+    # de servicio y cola.
     value = db.Column(db.Integer)
     service = db.Column(db.String(50))
     queue = db.Column(db.String(50))
 
 
-
 class ACLSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
+        # 'model' es obligatorio: marshmallow 4 ya no crea campos implicitos,
+        # asi que sin el los nombres listados en 'fields' no existirian.
+        model = ACL
         fields = ("value",)
 
 
 ACL_schema = ACLSchema()
 
+
 class ACLResource(Resource):
     @jwt_required()
     def get(self, service_name, queue_name):
-        acl = ACL.query.filter(ACL.service==service_name).filter(ACL.queue==queue_name).first_or_404()
+        acl = db.first_or_404(
+            db.select(ACL).filter_by(service=service_name, queue=queue_name)
+        )
         return ACL_schema.dump(acl)
 
 
