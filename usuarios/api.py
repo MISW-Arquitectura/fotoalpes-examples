@@ -4,7 +4,7 @@ from flask_marshmallow import Marshmallow
 from flask_restful import Api, Resource
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////mnt/usarios.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////mnt/usuarios.db'
 db = SQLAlchemy(app)
 ma = Marshmallow(app)
 api = Api(app)
@@ -15,9 +15,11 @@ class User(db.Model):
     username = db.Column(db.String(50), unique=True)
 
 
-
 class UserSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
+        # 'model' es obligatorio: marshmallow 4 ya no crea campos implicitos,
+        # asi que sin el los nombres listados en 'fields' no existirian.
+        model = User
         fields = ("id", "username")
 
 
@@ -27,8 +29,8 @@ users_schema = UserSchema(many=True)
 
 class UserListResource(Resource):
     def get(self):
-        posts = User.query.all()
-        return users_schema.dump(posts)
+        users = db.session.scalars(db.select(User)).all()
+        return users_schema.dump(users)
 
     def post(self):
         new_user = User(
@@ -41,9 +43,8 @@ class UserListResource(Resource):
 
 class UserResource(Resource):
     def get(self, user_id):
-        user = User.query.get_or_404(user_id)
+        user = db.get_or_404(User, user_id)
         return user_schema.dump(user)
-
 
 
 api.add_resource(UserListResource, '/users')

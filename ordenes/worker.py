@@ -14,6 +14,7 @@ ma = Marshmallow(app)
 api = Api(app)
 q = Queue(connection=Redis(host='redis', port=6379, db=0))
 
+
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user = db.Column(db.Integer)
@@ -24,19 +25,29 @@ class Order(db.Model):
 
 class OrderSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
-        fields = ("id", "user", "prodcut", "quantity", "state")
+        # 'model' es obligatorio: marshmallow 4 ya no crea campos implicitos,
+        # asi que sin el los nombres listados en 'fields' no existirian.
+        model = Order
+        fields = ("id", "user", "product", "quantity", "state")
 
 
 order_schema = OrderSchema()
 orders_schema = OrderSchema(many=True)
 
+
 def process_order(order_id):
-    order = Order.query.get(order_id)
-    product = requests.get(f"http://products:5000/products/{order.product}")
-    product = product.json()
-    if product['stock'] >= order.quantity:
-        requests.put(f"http://products:5000/products/{order.product}", json={'stock': product['stock']-order.quantity})
-        order.state = "completed"
-    else:
-        order.state = "failed"
-    db.session.commit()
+    # Esta funcion la ejecuta el worker de RQ, fuera del ciclo de request,
+    # por lo que necesita abrir su propio contexto de aplicacion.
+    with app.app_context():
+        order = db.session.get(Order, order_id)
+        product = requests.get(f"http://products:5000/products/{order.product}")
+        product = product.json()
+        if product['stock'] >= order.quantity:
+            requests.put(
+                f"http://products:5000/products/{order.product}",
+                json={'stock': product['stock'] - order.quantity},
+            )
+            order.state = "completed"
+        else:
+            order.state = "failed"
+        db.session.commit()

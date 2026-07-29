@@ -16,11 +16,13 @@ class Product(db.Model):
     description = db.Column(db.String(200))
     value = db.Column(db.Integer)
     stock = db.Column(db.Integer)
-    
 
 
 class ProductSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
+        # 'model' es obligatorio: marshmallow 4 ya no crea campos implicitos,
+        # asi que sin el los nombres listados en 'fields' no existirian.
+        model = Product
         fields = ("id", "name", "description", "value", "stock")
 
 
@@ -30,7 +32,7 @@ products_schema = ProductSchema(many=True)
 
 class ProductListResource(Resource):
     def get(self):
-        products = Product.query.all()
+        products = db.session.scalars(db.select(Product)).all()
         return products_schema.dump(products)
 
     def post(self):
@@ -47,11 +49,11 @@ class ProductListResource(Resource):
 
 class ProductResource(Resource):
     def get(self, product_id):
-        product = Product.query.get_or_404(product_id)
+        product = db.get_or_404(Product, product_id)
         return product_schema.dump(product)
-    
+
     def put(self, product_id):
-        product = Product.query.get_or_404(product_id)
+        product = db.get_or_404(Product, product_id)
         if 'name' in request.json:
             product.name = request.json['name']
         if 'description' in request.json:
@@ -62,8 +64,6 @@ class ProductResource(Resource):
             product.stock = request.json['stock']
         db.session.commit()
         return product_schema.dump(product)
-
-
 
 
 api.add_resource(ProductListResource, '/products')

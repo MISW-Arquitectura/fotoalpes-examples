@@ -1,15 +1,18 @@
 import requests
 from worker import app, api, ma, db, Order, order_schema, orders_schema, q, process_order, Resource, Flask, request, jsonify
 
+
 class OrderListResource(Resource):
     def get(self):
-        orders = Order.query.all()
+        orders = db.session.scalars(db.select(Order)).all()
         return orders_schema.dump(orders)
 
     def post(self):
+        # Comunicacion sincrona: se consulta a los otros servicios por HTTP
+        # antes de aceptar la orden.
         user = requests.get(f"http://users:5000/users/{request.json['user']}")
         product = requests.get(f"http://products:5000/products/{request.json['product']}")
-        if user.status_code==200 and product.status_code==200:
+        if user.status_code == 200 and product.status_code == 200:
             new_order = Order(
                 user=request.json['user'],
                 product=request.json['product'],
@@ -27,9 +30,8 @@ class OrderListResource(Resource):
 
 class OrderResource(Resource):
     def get(self, order_id):
-        order = Order.query.get_or_404(order_id)
+        order = db.get_or_404(Order, order_id)
         return order_schema.dump(order)
-
 
 
 api.add_resource(OrderListResource, '/orders')
