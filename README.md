@@ -44,6 +44,8 @@ O en segundo plano, esperando a que todos los servicios queden saludables:
 docker compose up -d --build --wait
 ```
 
+> **La primera vez tarda varios minutos.** Docker descarga la imagen base de Python e instala las dependencias de cada servicio. Aunque la terminal parezca detenida, está compilando: no la interrumpa. Las siguientes ejecuciones son casi inmediatas gracias a la caché.
+
 Los servicios quedan expuestos a través del API Gateway en **http://localhost:5000**.
 
 Para revisar el estado y los logs:
@@ -145,7 +147,7 @@ curl -X POST http://localhost:5000/api-commands/users \
   -d '{"username":"ana"}'
 ```
 
-También puede usar [Postman](https://www.postman.com/downloads/): en [POSTMAN.md](POSTMAN.md) está el paso a paso con capturas y todas las operaciones de las cuatro ramas.
+**Con Postman:** importe el archivo [`fotoalpes.postman_collection.json`](fotoalpes.postman_collection.json) que viene en el repositorio y tendrá todas las operaciones listas, sin escribir una sola URL. Los ids de usuario, producto y orden se guardan solos al crearlos. En [POSTMAN.md](POSTMAN.md) está el paso a paso con capturas.
 
 ## Descripción de los servicios
 

@@ -1,0 +1,341 @@
+{
+  "info": {
+    "name": "Foto Alpes - main",
+    "description": "Coleccion para probar el ejemplo Foto Alpes, rama `main`.\n\nComo usarla:\n\n1. Levante los servicios con `docker compose up -d --build --wait`.\n2. Ejecute las peticiones en el orden de las carpetas.\n\nLos ids de usuario, producto y orden se guardan solos al crearlos, \nasi que no tiene que copiarlos a mano.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Usuarios",
+      "item": [
+        {
+          "name": "Crear usuario",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api-commands/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api-commands",
+                "users"
+              ]
+            },
+            "description": "Guarda el id en la variable 'userId'.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"ana\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Guarda el id devuelto para que las demas peticiones lo usen.",
+                  "if (pm.response.code === 200) {",
+                  "    const datos = pm.response.json();",
+                  "    if (datos.id) {",
+                  "        pm.collectionVariables.set('userId', datos.id);",
+                  "        console.log('userId = ' + datos.id');",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar usuarios",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api-queries/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api-queries",
+                "users"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Consultar usuario",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api-queries/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api-queries",
+                "users",
+                "{{userId}}"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Productos",
+      "item": [
+        {
+          "name": "Crear producto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api-commands/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api-commands",
+                "products"
+              ]
+            },
+            "description": "Guarda el id en la variable 'productId'.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Camara\",\n    \"description\": \"Camara de prueba\",\n    \"value\": 1500,\n    \"stock\": 100\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Guarda el id devuelto para que las demas peticiones lo usen.",
+                  "if (pm.response.code === 200) {",
+                  "    const datos = pm.response.json();",
+                  "    if (datos.id) {",
+                  "        pm.collectionVariables.set('productId', datos.id);",
+                  "        console.log('productId = ' + datos.id');",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar productos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api-queries/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api-queries",
+                "products"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Consultar producto",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api-queries/products/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api-queries",
+                "products",
+                "{{productId}}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Modificar producto",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api-commands/products/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api-commands",
+                "products",
+                "{{productId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Camara\",\n    \"description\": \"Camara de prueba modificada\",\n    \"value\": 1800,\n    \"stock\": 500\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Ordenes",
+      "item": [
+        {
+          "name": "Crear orden",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api-commands/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api-commands",
+                "orders"
+              ]
+            },
+            "description": "El usuario y el producto llegan a este servicio por replicacion asincrona. Si acaba de crearlos y recibe un 400, espere unos segundos y reintente.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"user\": {{userId}},\n    \"product\": {{productId}},\n    \"quantity\": 10\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Guarda el id de la orden creada.",
+                  "if (pm.response.code === 200) {",
+                  "    const datos = pm.response.json();",
+                  "    if (datos.id) {",
+                  "        pm.collectionVariables.set('orderId', datos.id);",
+                  "        console.log('orderId = ' + datos.id);",
+                  "    }",
+                  "}",
+                  "if (pm.response.code === 400) {",
+                  "    console.log('400: el usuario o el producto todavia no han sido replicados');",
+                  "    console.log('en la base de datos del servicio de ordenes. Espere unos');",
+                  "    console.log('segundos y vuelva a enviar esta peticion.');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar ordenes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api-queries/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api-queries",
+                "orders"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Consultar orden",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api-queries/orders/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api-queries",
+                "orders",
+                "{{orderId}}"
+              ]
+            },
+            "description": "La orden se crea en 'processing'. Vuelva a enviar esta peticion unos segundos despues para verla en 'completed' o 'failed'."
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000"
+    },
+    {
+      "key": "userId",
+      "value": "1"
+    },
+    {
+      "key": "productId",
+      "value": "1"
+    },
+    {
+      "key": "orderId",
+      "value": "1"
+    }
+  ]
+}
