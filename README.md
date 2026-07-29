@@ -1,71 +1,150 @@
-# fotoalpes-microservices-examples - sync
+# fotoalpes-examples — rama `sync-sec`
 
-## Instalación
+Ejemplo resuelto del caso **Foto Alpes** para el curso de Arquitecturas Ágiles de Software (MISW). Esta rama toma la comunicación **síncrona** de la rama `sync` y le agrega las tácticas de seguridad: **TLS** entre todos los componentes y **autenticación con tokens JWT**, más un componente **ACL** que decide a qué cola puede acceder cada servicio.
 
-Los servicios de este ejemplo requieren de *flask*, *redis*, *docker* y *docker-compose*. Se debe clonar este repositorio y, en caso de usar Linux Ubuntu ejecutar el archivo install.sh para instalar las librerías y los servicios. Después de ejecutar el archivo se debe reiniciar la máquina virtual. Si usa un sistema operativo distinto, debe instalar las librerías requeridas de manera manual.
+## Ramas del proyecto
 
-```
-sh install.sh
-```
+| Rama | Contenido |
+|---|---|
+| `main` | CQRS y comunicación asíncrona |
+| `sync` | Comunicación síncrona |
+| `sync-sec` | Tokens JWT y certificados, con comunicación síncrona |
+| `async-sec` | Tokens JWT y certificados, con comunicación asíncrona |
+
+## Requisitos
+
+Solo necesita **Docker** con **Compose v2**.
+
+- **macOS / Windows:** instale [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+- **Ubuntu / Debian:** ejecute `sh install.sh` y luego cierre y reabra la sesión.
+
+Verifique con `docker compose version`.
 
 ## Ejecución
 
-Para correr la aplicación se debe ejecutar el siguiente comando:
-
-
-```
-docker-compose up
+```sh
+docker compose up -d --build --wait
 ```
 
-O si prefiere correr la aplicación en background se debe ejecutar el siguiente comando:
+Los servicios quedan expuestos a través del API Gateway en **https://localhost:5000** (note el **https**).
 
-```
-docker-compose up -d
-```
+Para detener todo y borrar los datos:
 
-
-
-## Descripción de los servicios
-
-Esta rama (sync-sec) muestra la comunicación entre servicios de manera síncrona. Para la seguridad se utiliza un certificado SSL para asegurar la comunicación entre los servicios y se implementa un componente encargado de la gestión de tokens para autenticar el llamado de los servicios expuestos. El ejemplo implementa cuatro componentes:
-
-#### Ordenes
-
-Este servicio expone tres operaciones, lasd cuales se encuentran definidas en el archivo api.py:
-
-- Listar todas las órdenes: Esta operación se implementa en la función OrderListResource a través del método get.
-- Crear una nueva orden: Esta operación se implementa en la función OrderListResource a través del método post.
-- Consultar una orden específica: Esta operación se implementa en la función OrderResource a través del método get.
-
-Se puede observar que la operación que crea una nueva orden valida que el producto y el usuario sean válidos. Para esto, utiliza las operaciones de consulta expuestas por los servicios Usuarios y Productos de manera síncrona.
-
-```python
-user = requests.get(f"http://users:5000/users/{request.json['user']}")
-product = requests.get(f"http://products:5000/products/{request.json['product']}")
+```sh
+docker compose down -v
 ```
 
-#### Productos
+## Certificados
 
-Este servicio expone cuatro operaciones:
+El API Gateway usa un certificado **autofirmado** versionado en `nginx/`. Su navegador y Postman mostrarán una advertencia de certificado no confiable: es lo esperado.
 
-- Listar todos los productos: Esta operación se implementa en la función ProductListResource a través del método get.
-- Crear un nuevo producto: Esta operación se implementa en la función ProductListResource a través del método post.
-- Consultar un producto específico: Esta operación se implementa en la función ProductResource a través del método get.
-- Modificar un producto: Esta operación se implementa en la función ProductResource a través del método put.
+> **Estos son certificados de prueba.** La llave privada está en el repositorio a propósito para que el ejemplo funcione sin pasos adicionales. Nunca los use fuera del aula.
 
-#### Usuarios
+En Postman debe desactivar la verificación de certificados: **File → Settings → SSL certificate verification → Off**.
 
-Este servicio expone tres operaciones:
+El certificado actual vence en **2046**. Si necesita regenerarlo (o cambiar los nombres que cubre), ejecute:
 
-- Listar todos los usuarios: Esta operación se implementa en la función UserListResource a través del método get.
-- Crear un nuevo usuario: Esta operación se implementa en la función UserListResource a través del método post.
-- Consultar un usuario específico: Esta operación se implementa en la función UserResource a través del método get.
+```sh
+sh nginx/generar_certificados.sh
+docker compose up -d --build --wait
+```
 
-#### Jwt
+> Los certificados originales de este ejemplo vencieron en mayo de 2024 y hacían fallar la rama completa. El CI ahora verifica la vigencia en cada corrida para que eso no vuelva a pasar en silencio.
 
-Este servicio expone una sola operación:
+## Autenticación
 
-- Crear token: Esta operación se implementa en la función AuthResource a través del método get, la cual retorna un token el cual se debe incluir en el llamado de cualquiera de los otros servicios descritos anteriormente. Se puede observar que antes de la definición de cada función en todos los servicios, se especifica una instrucción (@jwt_required) que obliga a la validación del token generado por la operación Crear token:
+**Todos los servicios exigen un token JWT.** Antes de consumir cualquier operación debe pedir un token al componente `jwt`:
+
+```sh
+curl -k https://localhost:5000/jwt
+```
+
+Respuesta:
+
+```json
+{ "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." }
+```
+
+Ese token se envía en la cabecera `Authorization` de todas las demás peticiones:
+
+```sh
+curl -k https://localhost:5000/users \
+  -H "Authorization: Bearer <token>"
+```
+
+Sin token, los servicios responden **401**.
+
+> La opción `-k` de curl omite la validación del certificado autofirmado, igual que el ajuste de Postman.
+
+## Verificar que todo funciona
+
+Con los servicios corriendo:
+
+```sh
+python3 smoke_test.py
+```
+
+La prueba verifica el flujo funcional completo **y** la parte de seguridad: que el componente `jwt` entregue un token, que los servicios rechacen peticiones sin token (401), que el ACL responda qué cola corresponde al servicio de órdenes, que la orden se complete descontando el stock, y que una orden por encima del stock quede en `failed`.
+
+Si prefiere no depender de Python en su máquina:
+
+```sh
+docker run --rm --network fotoalpes-examples_default \
+  -v "$PWD/smoke_test.py:/smoke_test.py:ro" \
+  fotoalpes-examples-users python /smoke_test.py https://nginx:443
+```
+
+## Endpoints
+
+Todas las rutas pasan por el API Gateway en `https://localhost:5000` y **requieren token**, excepto `/jwt`.
+
+| Componente | Operación | Método | Ruta |
+|---|---|---|---|
+| Jwt | Obtener token (**sin** token) | GET | `/jwt` |
+| ACL | Consultar cola de un servicio | GET | `/acl/<servicio>/<cola>` |
+| Usuarios | Listar / crear | GET / POST | `/users` |
+| Usuarios | Consultar | GET | `/users/<id>` |
+| Productos | Listar / crear | GET / POST | `/products` |
+| Productos | Consultar / modificar | GET / PUT | `/products/<id>` |
+| Órdenes | Listar / crear | GET / POST | `/orders` |
+| Órdenes | Consultar | GET | `/orders/<id>` |
+
+Cuerpos de las peticiones:
+
+```json
+{ "username": "nombre_del_usuario" }
+```
+
+```json
+{
+  "name": "Nombre del producto",
+  "description": "Descripción del producto",
+  "value": 1500,
+  "stock": 100
+}
+```
+
+```json
+{
+  "user": 1,
+  "product": 1,
+  "quantity": 10
+}
+```
+
+> La orden se crea en estado `processing` y un worker la procesa. Consúltela unos segundos después para verla en `completed` o `failed`.
+
+En `vm/README.md` de la rama `main` está el paso a paso de Postman con capturas.
+
+## Descripción de los componentes
+
+### Jwt
+
+Expone una sola operación (`jwt/api.py`):
+
+- **Crear token** (`AuthResource.get`), que devuelve el token a incluir en las demás llamadas.
+
+En cada operación de los otros servicios se declara `@jwt_required()`, que obliga a validar ese token:
 
 ```python
 class OrderListResource(Resource):
@@ -73,28 +152,56 @@ class OrderListResource(Resource):
     def get(self):
 ```
 
-#### API Gateway
+### ACL
 
-En este ejemplo se utiliza la configuración proxy del servidor Ngnix para implementar el componente API Gateway. Este configuración permite que todas las solicitudes se hagan al servidor Ngnix y este redireccione al servicio correspondiente de acuerdo a la ruta especificada en el url, por ejemplo http://localhost/users:
+Expone una operación (`acl/api.py`) que responde qué cola tiene autorizada un servicio. El servicio de órdenes la consulta **al arrancar** para saber qué base de datos de Redis puede usar:
+
+```python
+queue_name = obtener_cola()
+q = Queue(connection=Redis(host='redis', port=6379, db=queue_name))
+```
+
+> Esa consulta ocurre al importar el módulo. Si `jwt` o `acl` aún no responden, el contenedor moriría al arrancar, por lo que `obtener_cola()` reintenta y el `docker-compose.yaml` declara la dependencia con `condition: service_healthy`.
+
+### Órdenes
+
+Tres operaciones en `ordenes/api.py`: listar, crear y consultar. La creación **valida de forma síncrona** que el usuario y el producto existan, reenviando el token del cliente a los otros servicios:
+
+```python
+headers = {'Authorization': request.headers['Authorization']}
+user = requests.get(f"https://users:5000/users/{...}", verify=False, headers=headers)
+```
+
+El procesamiento posterior vive en `ordenes/worker.py`, donde `process_order` pide su **propio** token (no hay un cliente del cual reenviarlo) y descuenta el stock con un PUT al servicio de productos.
+
+### Productos y Usuarios
+
+Exponen las mismas operaciones que en la rama `sync`, pero con `@jwt_required()` en todas y sirviendo por HTTPS.
+
+### API Gateway
+
+nginx recibe todo el tráfico en HTTPS y lo redirige al servicio correspondiente, también por HTTPS:
 
 ```
+listen 443 ssl;
+http2 on;
+ssl_certificate /etc/ssl/certs/localhost.crt;
+ssl_certificate_key /etc/ssl/private/localhost.key;
+ssl_protocols TLSv1.2 TLSv1.3;
+
 location /users {
-  proxy_pass http://users:5000;
-  proxy_set_header X-Real-IP  $remote_addr;
-  proxy_set_header X-Forwarded-For $remote_addr;
-  proxy_set_header Host $host;
-}
-location /products {
-  proxy_pass http://products:5000;
-  proxy_set_header X-Real-IP  $remote_addr;
-  proxy_set_header X-Forwarded-For $remote_addr;
-  proxy_set_header Host $host;
-}
-location /orders {
-  proxy_pass http://orders:5000;
-  proxy_set_header X-Real-IP  $remote_addr;
-  proxy_set_header X-Forwarded-For $remote_addr;
-  proxy_set_header Host $host;
+  proxy_pass https://users:5000;
+  ...
 }
 ```
-Adicionalmente se configura el servidor Ngnix para utilizar un certificado SSL autogenerado para cifrar la información que fluye entre los servicios y entre el usuario y el servidor Nginx, por lo que ahora se utiliza el protocolo https a diferencia de la rama sync en donde se utiliza el protocolo http.
+
+La configuración completa está en `nginx/nginx-proxy.conf`.
+
+## Notas de mantenimiento
+
+- **Todas las versiones están fijadas**, incluidas las imágenes de Redis y nginx. Sin eso el ejemplo deja de compilar solo con que pase el tiempo.
+- Las llamadas entre servicios usan `verify=False` porque los certificados son autofirmados. **Es aceptable solo en este ejemplo**; en un sistema real habría que validar la cadena de certificación.
+- La configuración de nginx ya no acepta TLS 1.0 ni 1.1: están obsoletos y las versiones actuales de nginx y OpenSSL los rechazan.
+- `Flask-JWT-Extended` usa `JWT_SECRET_KEY = "secret-jwt"` y tokens que **no expiran** (`JWT_ACCESS_TOKEN_EXPIRES = False`). Ambas cosas son deliberadas para simplificar el ejemplo y ambas serían graves en producción.
+- El `docker-compose.yaml` **no define política de `restart`** a propósito: si un servicio falla, debe quedar caído y visible en `docker compose ps`.
+- Los servicios corren con el servidor de desarrollo de Flask y certificados `adhoc`. Adecuado para el aula, no para despliegues reales.

@@ -22,18 +22,23 @@ class ACL(db.Model):
     queue = db.Column(db.String(50))
 
 
-
 class ACLSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
+        # 'model' es obligatorio: marshmallow 4 ya no crea campos implicitos,
+        # asi que sin el los nombres listados en 'fields' no existirian.
+        model = ACL
         fields = ("id",)
 
 
 ACL_schema = ACLSchema()
 
+
 class ACLResource(Resource):
     @jwt_required()
     def get(self, service_name, queue_name):
-        acl = ACL.query.filter(ACL.service==service_name).filter(ACL.queue==queue_name).first_or_404()
+        acl = db.first_or_404(
+            db.select(ACL).filter_by(service=service_name, queue=queue_name)
+        )
         return ACL_schema.dump(acl)
 
 

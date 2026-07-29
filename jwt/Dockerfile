@@ -1,8 +1,10 @@
+FROM python:3.13-slim
 
-FROM python:3
-RUN mkdir /backend
 WORKDIR /backend
-ADD requirements.txt /backend/
-RUN pip install -r requirements.txt
-ADD * /backend/
+
+COPY requirements.txt /backend/
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . /backend/
+
 EXPOSE 5000

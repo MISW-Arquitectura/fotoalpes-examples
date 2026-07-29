@@ -2,18 +2,27 @@ import requests
 from worker import app, api, ma, db, Order, order_schema, orders_schema, q, process_order, Resource, Flask, request, jsonify
 from flask_jwt_extended import jwt_required
 
+
 class OrderListResource(Resource):
     @jwt_required()
     def get(self):
-        orders = Order.query.all()
+        orders = db.session.scalars(db.select(Order)).all()
         return orders_schema.dump(orders)
 
     @jwt_required()
     def post(self):
+        # Comunicacion sincrona: se reenvia el token del cliente para consultar
+        # a los otros servicios, que tambien exigen autenticacion.
         headers = {'Authorization': request.headers['Authorization']}
-        user = requests.get(f"https://users:5000/users/{request.json['user']}", verify=False, headers=headers)
-        product = requests.get(f"https://products:5000/products/{request.json['product']}", verify=False, headers=headers)
-        if user.status_code==200 and product.status_code==200:
+        user = requests.get(
+            f"https://users:5000/users/{request.json['user']}",
+            verify=False, headers=headers, timeout=10,
+        )
+        product = requests.get(
+            f"https://products:5000/products/{request.json['product']}",
+            verify=False, headers=headers, timeout=10,
+        )
+        if user.status_code == 200 and product.status_code == 200:
             new_order = Order(
                 user=request.json['user'],
                 product=request.json['product'],
@@ -32,9 +41,8 @@ class OrderListResource(Resource):
 class OrderResource(Resource):
     @jwt_required()
     def get(self, order_id):
-        order = Order.query.get_or_404(order_id)
+        order = db.get_or_404(Order, order_id)
         return order_schema.dump(order)
-
 
 
 api.add_resource(OrderListResource, '/orders')
