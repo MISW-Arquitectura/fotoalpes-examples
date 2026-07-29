@@ -21,11 +21,13 @@ class Product(db.Model):
     description = db.Column(db.String(200))
     value = db.Column(db.Integer)
     stock = db.Column(db.Integer)
-    
 
 
 class ProductSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
+        # 'model' es obligatorio: marshmallow 4 ya no crea campos implicitos,
+        # asi que sin el los nombres listados en 'fields' no existirian.
+        model = Product
         fields = ("id", "name", "description", "value", "stock")
 
 

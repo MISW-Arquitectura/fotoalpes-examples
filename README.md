@@ -1,80 +1,198 @@
-# fotoalpes-microservices-examples - main
+# fotoalpes-examples — rama `main`
 
-## Instalación
+Ejemplo resuelto del caso **Foto Alpes** para el curso de Arquitecturas Ágiles de Software (MISW). Esta rama implementa el patrón **CQRS** con **comunicación asíncrona** entre microservicios, usando Redis como plataforma de mensajería.
 
-Si usted descargó la imagen de la máquina virtual para Virtual Box omita esta sección y pase a la sección Ejecución. Los servicios de este ejemplo requieren de *flask*, *redis*, *docker* y *docker-compose*. Se debe clonar este repositorio y, en caso de usar Linux Ubuntu ejecutar el archivo install.sh para instalar las librerías y los servicios. Después de ejecutar el archivo se debe reiniciar la máquina virtual. Si usa un sistema operativo distinto, debe instalar las librerías requeridas de manera manual.
+## Ramas del proyecto
 
+| Rama | Contenido |
+|---|---|
+| `main` | CQRS y comunicación asíncrona |
+| `sync` | Comunicación síncrona |
+| `sync-sec` | Tokens JWT y certificados, con comunicación síncrona |
+| `async-sec` | Tokens JWT y certificados, con comunicación asíncrona |
+
+## Requisitos
+
+Solo necesita **Docker** con **Compose v2**. Todo lo demás (Python, Flask, Redis, nginx) corre dentro de contenedores.
+
+- **macOS / Windows:** instale [Docker Desktop](https://www.docker.com/products/docker-desktop/), que ya incluye Compose v2.
+- **Ubuntu / Debian:** ejecute el script incluido y luego cierre y reabra la sesión.
+
+  ```sh
+  sh install.sh
+  ```
+
+Verifique la instalación con:
+
+```sh
+docker compose version
 ```
-sh install.sh
-```
+
+> El comando moderno es `docker compose` (sin guion). El antiguo `docker-compose` corresponde a la v1, que ya no tiene soporte.
 
 ## Ejecución
 
-Para correr la aplicación se debe ejecutar el siguiente comando:
+Desde la raíz del repositorio:
 
-
-```
-docker-compose up
-```
-
-O si prefiere correr la aplicación en background se debe ejecutar el siguiente comando:
-
-```
-docker-compose up -d
+```sh
+docker compose up --build
 ```
 
+O en segundo plano, esperando a que todos los servicios queden saludables:
 
+```sh
+docker compose up -d --build --wait
+```
+
+Los servicios quedan expuestos a través del API Gateway en **http://localhost:5000**.
+
+Para revisar el estado y los logs:
+
+```sh
+docker compose ps
+docker compose logs -f orders-commands
+```
+
+Para detener todo y borrar los datos (bases SQLite y cola de Redis):
+
+```sh
+docker compose down -v
+```
+
+## Verificar que todo funciona
+
+El repositorio incluye una prueba de humo que recorre el flujo completo: crea un usuario y un producto, espera a que el worker los replique en la base de datos del servicio de órdenes, crea una orden, comprueba que el procesamiento asíncrono la marcó como `completed` y descontó el stock, y finalmente modifica el producto para verificar que la réplica se actualiza.
+
+Con los servicios ya corriendo:
+
+```sh
+python3 smoke_test.py
+```
+
+Si prefiere no depender de Python en su máquina, puede correrla dentro de la red de Docker:
+
+```sh
+docker run --rm --network fotoalpes-examples_default \
+  -v "$PWD/smoke_test.py:/smoke_test.py:ro" \
+  fotoalpes-examples-users-commands python /smoke_test.py http://nginx:80
+```
+
+La prueba termina con código de salida 0 si todo está bien y 1 si algo falló, indicando qué verificación no pasó.
+
+## Endpoints
+
+Todas las rutas pasan por el API Gateway en `http://localhost:5000`.
+
+### Usuarios
+
+| Operación | Método | Ruta |
+|---|---|---|
+| Crear usuario | POST | `/api-commands/users` |
+| Listar usuarios | GET | `/api-queries/users` |
+| Consultar usuario | GET | `/api-queries/users/<id>` |
+
+Cuerpo para crear un usuario:
+
+```json
+{ "username": "nombre_del_usuario" }
+```
+
+### Productos
+
+| Operación | Método | Ruta |
+|---|---|---|
+| Crear producto | POST | `/api-commands/products` |
+| Modificar producto | PUT | `/api-commands/products/<id>` |
+| Listar productos | GET | `/api-queries/products` |
+| Consultar producto | GET | `/api-queries/products/<id>` |
+
+Cuerpo para crear o modificar un producto:
+
+```json
+{
+  "name": "Nombre del producto",
+  "description": "Descripción del producto",
+  "value": 1500,
+  "stock": 100
+}
+```
+
+### Órdenes
+
+| Operación | Método | Ruta |
+|---|---|---|
+| Crear orden | POST | `/api-commands/orders` |
+| Listar órdenes | GET | `/api-queries/orders` |
+| Consultar orden | GET | `/api-queries/orders/<id>` |
+
+Cuerpo para crear una orden. Los campos `user` y `product` deben corresponder al id de un usuario y un producto **creados previamente**:
+
+```json
+{
+  "user": 1,
+  "product": 1,
+  "quantity": 10
+}
+```
+
+> La orden se crea en estado `processing` y un worker la procesa de forma asíncrona. Consúltela de nuevo unos segundos después para verla en `completed` o `failed`.
+
+Ejemplo con `curl`:
+
+```sh
+curl -X POST http://localhost:5000/api-commands/users \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"ana"}'
+```
+
+También puede usar [Postman](https://www.postman.com/downloads/); en `vm/README.md` está el paso a paso con capturas.
 
 ## Descripción de los servicios
 
-Esta rama (main) muestra la comunicación entre servicios de manera asíncrona e implementa el patrón CQRS. Para la comunicación asíncrona se utiliza Redis como plataforma de mensajería.
+Al implementar el patrón CQRS, cada servicio expone sus operaciones en dos partes: comandos (`api_commands.py`) y consultas (`api_queries.py`). Cada parte corre en su propio contenedor.
 
-El ejemplo implementa tres servicios:
+### Órdenes
 
-#### Ordenes
+En `api_commands.py`:
 
-Al implemetar el patrón CQRS las operaciones que expone este servicio se implementan en dos partes:   comandos (api_commands.py) y consultas (api_queries.py). En el archivo api_comands se tienen las siguientes operaciones:
+- **Crear una nueva orden** (`OrderListResource.post`). Una vez creada, se encola el id de la orden para que sea procesada:
 
-- Crear una nueva orden: Esta operación se implementa en la función OrderListResource a través del método post.
+  ```python
+  # add to queue to process order
+  q.enqueue(process_order, new_order.id)
+  ```
 
-Se puede observar que una vez creada la orden se coloca en la cola el id de la orden para que esta sea procesada.
+En `api_queries.py`:
 
-```python
-# add to queue to process order
-q.enqueue(process_order, new_order.id)
-```
+- **Listar todas las órdenes** (`OrderListResource.get`).
+- **Consultar una orden específica** (`OrderResource.get`).
 
-En el archivo api_queries se tienen las siguientes operaciones:
+### Productos
 
-- Listar todas las órdenes: Esta operación se implementa en la función OrderListResource a través del método get.
-- Consultar una orden específica: Esta operación se implementa en la función OrderResource a través del método get.
+En `api_commands.py`:
 
-#### Productos
+- **Crear un nuevo producto** (`ProductListResource.post`).
+- **Modificar un producto** (`ProductResource.put`).
 
-Al implemetar el patrón CQRS las operaciones que expone este servicio se implementan en dos partes:   comandos (api_commands.py) y consultas (api_queries.py). En el archivo api_comands se tienen las siguientes operaciones:
+En `api_queries.py`:
 
-- Crear un nuevo producto: Esta operación se implementa en la función ProductListResource a través del método post.
-- Modificar un producto: Esta operación se implementa en la función ProductResource a través del método put.
+- **Listar todos los productos** (`ProductListResource.get`).
+- **Consultar un producto específico** (`ProductResource.get`).
 
-En el archivo api_queries se tienen las siguientes operaciones:
+### Usuarios
 
-- Listar todos los productos: Esta operación se implementa en la función ProductListResource a través del método get.
-- Consultar un producto específico: Esta operación se implementa en la función ProductResource a través del método get.
+En `api_commands.py`:
 
-#### Usuarios
+- **Crear un nuevo usuario** (`UserListResource.post`).
 
-Al implemetar el patrón CQRS las operaciones que expone este servicio se implementan en dos partes:   comandos (api_commands.py) y consultas (api_queries.py). En el archivo api_comands se tienen las siguientes operaciones:
+En `api_queries.py`:
 
-- Crear un nuevo usuario: Esta operación se implementa en la función UserListResource a través del método post.
+- **Listar todos los usuarios** (`UserListResource.get`).
+- **Consultar un usuario específico** (`UserResource.get`).
 
-En el archivo api_queries se tienen las siguientes operaciones:
+### API Gateway
 
-- Listar todos los usuarios: Esta operación se implementa en la función UserListResource a través del método get.
-- Consultar un usuario específico: Esta operación se implementa en la función UserResource a través del método get.
-
-#### API Gateway
-
-En este ejemplo se utiliza la configuración proxy del servidor Ngnix para implementar el componente API Gateway. Esta configuración permite que todas las solicitudes se hagan al servidor Ngnix y este redireccione al servicio correspondiente de acuerdo a la operación y ruta especificada en el url, por ejemplo http://localhost/api-commands/users:
+Se usa la configuración de proxy de **nginx** como API Gateway. Todas las solicitudes llegan a nginx, que las redirige al servicio correspondiente según la ruta:
 
 ```
 location /api-commands/users {
@@ -83,68 +201,64 @@ location /api-commands/users {
   proxy_set_header X-Forwarded-For $remote_addr;
   proxy_set_header Host $host;
 }
-location /api-commands/products {
-  proxy_pass http://products-commands:5000;
-  proxy_set_header X-Real-IP  $remote_addr;
-  proxy_set_header X-Forwarded-For $remote_addr;
-  proxy_set_header Host $host;
-}
-location /api-commands/orders {
-  proxy_pass http://orders-commands:5000;
-  proxy_set_header X-Real-IP  $remote_addr;
-  proxy_set_header X-Forwarded-For $remote_addr;
-  proxy_set_header Host $host;
-}
 location /api-queries/users {
   proxy_pass http://users-queries:5000;
-  proxy_set_header X-Real-IP  $remote_addr;
-  proxy_set_header X-Forwarded-For $remote_addr;
-  proxy_set_header Host $host;
-}
-location /api-queries/products {
-  proxy_pass http://products-queries:5000;
-  proxy_set_header X-Real-IP  $remote_addr;
-  proxy_set_header X-Forwarded-For $remote_addr;
-  proxy_set_header Host $host;
-}
-location /api-queries/orders {
-  proxy_pass http://orders-queries:5000;
-  proxy_set_header X-Real-IP  $remote_addr;
-  proxy_set_header X-Forwarded-For $remote_addr;
-  proxy_set_header Host $host;
+  ...
 }
 ```
 
-#### Comunicación asíncrona
+La configuración completa está en `nginx/nginx-proxy.conf`.
 
-En esta rama, cada servicio tene una copia de la estructura de la BD de los demás servicios por lo que se debe actualizar la información en cada BD cuando se hace una actualización en alguno de los servicios. Por lo anterior, cada servicio usa la cola de mensajería para notificar a los demás los cambios realizados en su respectiva BD o para actualizar la BD con los cambios realizados por los otros servicios. A continuación se muestra el esquema descrito anteriormente para el servicio Productos:
+## Comunicación asíncrona
 
-###### Notificar cambios
+En esta rama cada servicio tiene una copia de la estructura de la base de datos de los demás, por lo que hay que propagar los cambios cuando alguno actualiza su información. Para eso cada servicio usa la cola de mensajería.
 
-En el archivo api_commands.py, el cual implementa las operaciones de creación y actualización de productos, se publica en la cola el id del producto creado o modificado para que los demás servicios actualicen su respectiva BD.
+Se usan **dos colas de Redis**, atendidas por dos workers distintos:
+
+| Cola | Worker | Corre en | Responsabilidad |
+|---|---|---|---|
+| db `0` | `worker-orders` | contenedor de `ordenes` | Procesa órdenes y replica usuarios y productos en la BD de órdenes |
+| db `1` | `worker-products` | contenedor de `productos` | Descuenta el stock en la BD de productos |
+
+### Notificar cambios
+
+En `api_commands.py` se publica en la cola la información del producto creado o modificado, para que los demás servicios actualicen su base de datos:
 
 ```python
-#Publicación en la cola en la creación de un producto
+# Publicación en la cola en la creación de un producto
 def post(self):
     ...
-	q.enqueue(send_product, product_schema.dump(new_product))
-#Publicación en la cola en la creación de un producto
+    q.enqueue(send_product, product_schema.dump(new_product))
+
+# Publicación en la cola en la modificación de un producto
 def put(self):
     ...
-	q.enqueue(put_product, product_schema.dump(product))
+    q.enqueue(put_product, product_schema.dump(product))
 ```
 
-El archivo sender.py publica en la cola el id de un nuevo producto. El archivo putter.py publica en la cola el id del producto modificado.
+`sender.py` publica el producto nuevo y `putter.py` el producto modificado.
 
-###### Actualizar cambios
+### Actualizar cambios
 
-Para el ejemplo, la actualización de un producto se realiza por parte del servicio de órdenes, el cual modifica la cantidad en stock del producto. Por lo anterior, el archivo updater.py implementa la actualización del producto cuyo id publica el servicio de órdenes en la cola. En la carpeta ordenes, en el archivo base.py se define la función process_order la cual verifica que el producto sea válido y si es así cambia el estado de la orden y publica en la cola el id del producto incluído en la orden.
+La actualización del stock la solicita el servicio de órdenes. En `ordenes/base.py`, la función `process_order` verifica que el producto tenga existencias suficientes, cambia el estado de la orden y publica en la segunda cola la cantidad a descontar:
 
 ```python
 def process_order(order_id):
-	...
-	q2.enqueue(update_product, {
-		'id': product.id,
-		'quantity': order.quantity
-	})
+    ...
+    q2.enqueue(update_product, {
+        'id': product.id,
+        'quantity': order.quantity
+    })
 ```
+
+`productos/updater.py` implementa el descuento real.
+
+> **Detalle importante para entender el ejemplo:** `ordenes/base.py` importa un `update_product` local que no hace nada (`ordenes/updater.py`). Ese *stub* existe solo para poder encolar la referencia: RQ la serializa como `updater.update_product` y quien la ejecuta es `worker-products`, que resuelve ese nombre contra `productos/updater.py`. Lo mismo ocurre con `sender.py` y `putter.py` en los otros servicios. Es decir, **la función que se importa no es la que se ejecuta**.
+
+## Notas de mantenimiento
+
+- **Todas las versiones están fijadas**, tanto la imagen base de Python como cada dependencia en los `requirements.txt` y las imágenes de Redis y nginx. Esto es deliberado: sin fijarlas, el ejemplo deja de compilar solo con que pase el tiempo.
+- Al actualizar dependencias, corra `smoke_test.py` antes de subir los cambios. La prueba verifica el flujo asíncrono completo, que es justamente lo que se rompe en silencio.
+- El `docker-compose.yaml` **no define política de `restart`** a propósito: si un servicio falla, debe quedar caído y visible en `docker compose ps` en vez de reiniciarse en bucle ocultando el error.
+- Las bases de datos son SQLite en archivo, compartidas por bind mount entre el contenedor de comandos y el de consultas de cada servicio. Es suficiente para el ejemplo, pero no es un diseño apto para producción.
+- Los servicios corren con el servidor de desarrollo de Flask (`app.run(debug=True)`). Es adecuado para el aula, no para despliegues reales.

@@ -7,7 +7,7 @@ from rq import Queue
 from sender import send_user
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////mnt/usarios.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////mnt/usuarios.db'
 db = SQLAlchemy(app)
 ma = Marshmallow(app)
 api = Api(app)
@@ -20,9 +20,11 @@ class User(db.Model):
     username = db.Column(db.String(50), unique=True)
 
 
-
 class UserSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
+        # 'model' es obligatorio: marshmallow 4 ya no crea campos implicitos,
+        # asi que sin el los nombres listados en 'fields' no existirian.
+        model = User
         fields = ("id", "username")
 
 

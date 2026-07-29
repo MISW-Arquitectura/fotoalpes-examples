@@ -1,4 +1,8 @@
-# fotoalpes-microservices-examples
+# fotoalpes-microservices-examples — máquina virtual (VirtualBox)
+
+> **Documento heredado.** La forma recomendada de correr el ejemplo es con Docker directamente en su máquina: vea el [README principal](../README.md). Esta guía se conserva por el paso a paso de **Postman**, que sigue siendo útil.
+>
+> **Advertencia sobre la imagen de la VM:** el enlace de descarga apunta al OneDrive personal de un docente que ya no está en la universidad, y no se ha verificado que siga disponible. Si va a usar la VM en un curso, compruebe el enlace **antes** de compartirlo con los estudiantes y considere alojar la imagen en un espacio institucional.
 
 ## Instalación
 
@@ -17,11 +21,11 @@ Para ejecutar el proyecto localmente, es necesario instalar [Oracle VirtualBox](
 
 3. Abrir Oracle Virtualbox e ir al menú Máquina --> Añadir
 
-   <img src="https://github.com/ci-cortesg/fotoalpes-microservices-examples/blob/main/img/Agregar_VM.png" alt="Agregar_VM" style="zoom:75%;" />
+   <img src="../img/Agregar_VM.png" alt="Agregar_VM" style="zoom:75%;" />
 
 4. Ubicar la carpeta donde se descomprimió el archivo zip y seleccionar el archivo MISW4202-FotoAlpes-Microservicios-New.ovdx
 
-   <img src="https://github.com/ci-cortesg/fotoalpes-microservices-examples/blob/main/img/Seleccionar_Archivo_VM.png" alt="Seleccionar_Archivo_VM" style="zoom:75%;" />
+   <img src="../img/Seleccionar_Archivo_VM.png" alt="Seleccionar_Archivo_VM" style="zoom:75%;" />
 
 5. En el menú izquierdo debe aparecer la máquina con el nombre del archivo seleccionado
 
@@ -31,11 +35,11 @@ Para ejecutar el proyecto localmente, es necesario instalar [Oracle VirtualBox](
 
 8. En la opción Chipset seleccionar la opción ICH9
 
-   <img src="https://github.com/ci-cortesg/fotoalpes-microservices-examples/blob/main/img/Change_Chipset_CH9.png" alt="Change_Chipset_CH9" style="zoom:75%;" />
+   <img src="../img/Change_Chipset_CH9.png" alt="Change_Chipset_CH9" style="zoom:75%;" />
    
 9. En el menú izquierdo dar clic sobre la opción USB y desmarcar la opción "Habilitar Controlador USB"
 
-   <img src="https://github.com/ci-cortesg/fotoalpes-microservices-examples/blob/main/img/Disable_USB.png" alt="Disable_USB" style="zoom:75%;" />
+   <img src="../img/Disable_USB.png" alt="Disable_USB" style="zoom:75%;" />
    
 10. Dar clic en el botón Aceptar en la parte inferior derecha
 
@@ -45,17 +49,17 @@ Para ejecutar el proyecto localmente, es necesario instalar [Oracle VirtualBox](
 
 13. En la opción Chipset seleccionar la opción PIIX3
 
-   <img src="https://github.com/ci-cortesg/fotoalpes-microservices-examples/blob/main/img/Change_Chipset_PIIX3.png" alt="Change_Chipset_PIIX3" style="zoom:75%;" />
+   <img src="../img/Change_Chipset_PIIX3.png" alt="Change_Chipset_PIIX3" style="zoom:75%;" />
 
 14. Dar clic en el botón Aceptar en la parte inferior derecha
 
 15. Dar clic en el botón Iniciar ubicado en la parte superior
 
-   <img src="https://github.com/ci-cortesg/fotoalpes-microservices-examples/blob/main/img/Iniciar_VM.png" alt="Iniciar_VM" style="zoom:75%;" />
+   <img src="../img/Iniciar_VM.png" alt="Iniciar_VM" style="zoom:75%;" />
 
 16. Una vez la máquina termine de cargar, debe visualizar la pantalla de inicio
 
-   <img src="https://github.com/ci-cortesg/fotoalpes-microservices-examples/blob/main/img/Pantalla_Inicio_VM.png" alt="Pantalla_Inicio_VM" style="zoom:75%;" />
+   <img src="../img/Pantalla_Inicio_VM.png" alt="Pantalla_Inicio_VM" style="zoom:75%;" />
 
 17. Ingresar con el usuario **estudiante** y la contraseña **Estudiante2021**
 
@@ -67,7 +71,7 @@ Para ejecutar el proyecto localmente, es necesario instalar [Oracle VirtualBox](
 
 19. Tomar nota de la dirección ip que se despliega en pantalla, como aparece en la siguiente imagen:
 
-    <img src="https://github.com/ci-cortesg/fotoalpes-microservices-examples/blob/main/img/Direccion_IP_VM.png" alt="Direccion_IP_VM" style="zoom:75%;" />
+    <img src="../img/Direccion_IP_VM.png" alt="Direccion_IP_VM" style="zoom:75%;" />
 
 20. La dirección IP obtenida en el paso anterior corresponde a la dirección asociada al adaptador de red de la máquina virtual. Tome nota de esta dirección porque se utilizará para acceder a los servicios desde su pc local
 
@@ -80,7 +84,7 @@ Para ejecutar el proyecto localmente, es necesario instalar [Oracle VirtualBox](
 22. Para ejecutar los servicios, corra el siguiente comando:
 
     ```
-    sudo docker-compose up
+    sudo docker compose up
     ```
 
 ## Pruebas
@@ -95,7 +99,7 @@ Una vez haya descargado e instalado Postman, ejecute este programa y deshabilite
 
 3. Deslice el botón SSL certification verification a la opción Off como se ve en la siguiente imagen.
 
-   <img src="https://github.com/ci-cortesg/fotoalpes-microservices-examples/blob/main/img/Postman_Settings.png" alt="Crear_Coleccion" style="zoom:75%;" />
+   <img src="../img/Postman_Settings.png" alt="Crear_Coleccion" style="zoom:75%;" />
 
 Para consumir alguno de los servicios implementados en el presente ejemplo, siga los siguientes pasos:
 
@@ -105,7 +109,7 @@ Para consumir alguno de los servicios implementados en el presente ejemplo, siga
 
 3. En el campo Name ingrese el nombre para el conjunto de pruebas o servicios, por ejemplo Ejemplo FotoAlpes. Luego haga clic en el botón Create
 
-   <img src="https://github.com/ci-cortesg/fotoalpes-microservices-examples/blob/main/img/Crear_Coleccion.png" alt="Crear_Coleccion" style="zoom:75%;" />
+   <img src="../img/Crear_Coleccion.png" alt="Crear_Coleccion" style="zoom:75%;" />
 
 4. Nuevamente haga clic en el botón New
 
@@ -117,34 +121,34 @@ Para consumir alguno de los servicios implementados en el presente ejemplo, siga
 
 8. Haga clic el el botón Save to ....
 
-   <img src="https://github.com/ci-cortesg/fotoalpes-microservices-examples/blob/main/img/Crear_Request.png" alt="Crear_Request" style="zoom:75%;" />
+   <img src="../img/Crear_Request.png" alt="Crear_Request" style="zoom:75%;" />
 
 9. Dependiendo del servicio a probar seleccione el método requerido. Para las operaciones de consulta, el método es Get. Para las operaciones de creación el método es Post y para las operaciones de modificación el método es Put. El ejemplo no implementa ningún otro tipo de operaciones.
 
-10. Ingrese el url del servicio y la operación a probar. Por ejemplo, para el caso de listar los usuarios, en la rama main, el url sería el siguiente: http://XXX.XXX.XXX.XXX/api-queries/users. Reemplace XXX.XXX.XXX.XXX por la dirección IP de la máquina virtual obtenida en el paso 19 de la sección **Instalación**.
+10. Ingrese el url del servicio y la operación a probar. Por ejemplo, para el caso de listar los usuarios, en la rama main, el url sería el siguiente: http://XXX.XXX.XXX.XXX:5000/api-queries/users. Reemplace XXX.XXX.XXX.XXX por la dirección IP de la máquina virtual obtenida en el paso 19 de la sección **Instalación**. El API Gateway se publica en el puerto **5000**.
 
 11. Haga clic en el botón Send
 
 12. En la opción Body de la respuesta recibida se puede ver la información que retorna el servicio
 
-    <img src="https://github.com/ci-cortesg/fotoalpes-microservices-examples/blob/main/img/Listar_Usuarios.png" alt="Listar_Usuarios" style="zoom:75%;" />
+    <img src="../img/Listar_Usuarios.png" alt="Listar_Usuarios" style="zoom:75%;" />
 
 
 Para el caso de las operaciones que usan los métodos Post y Put se debe especificar la información requerida por el servicio. Esta información se debe definir en formato Json en la opción Body del Request. La siguiente imagen muestra la definición de los datos para crear un nuevo usuario:
 
-<img src="https://github.com/ci-cortesg/fotoalpes-microservices-examples/blob/main/img/Crear_Usuario.png" alt="Postman_Settings" style="zoom:75%;" />
+<img src="../img/Crear_Usuario.png" alt="Postman_Settings" style="zoom:75%;" />
 
 ## Pruebas para las ramas de seguridad
 
 Para los servicios de las ramas sync-sec y async-sec se deben tener en cuenta lo siguiente:
 
-Antes de consumir cualquiera de los servcios implementados, es obligatorio obtener el token de seguridad del componente jwt. Para esto, ejecute los pasos 1 a 11 descritos anteriormente y en el paso 10 especifique el siguiente url: https://XXX.XXX.XXX.XXX/api-queries/jwt. Reemplace XXX.XXX.XXX.XXX por la dirección IP de la máquina virtual obtenida en el paso 19 de la sección Instalación.
+Antes de consumir cualquiera de los servicios implementados, es obligatorio obtener el token de seguridad del componente jwt. Para esto, ejecute los pasos 1 a 11 descritos anteriormente y en el paso 10 especifique el siguiente url: https://XXX.XXX.XXX.XXX:5000/api-queries/jwt. Reemplace XXX.XXX.XXX.XXX por la dirección IP de la máquina virtual obtenida en el paso 19 de la sección Instalación.
 
-<img src="https://github.com/ci-cortesg/fotoalpes-microservices-examples/blob/main/img/Get_Jwt_Token.png" alt="Get_Jwt_Token" style="zoom:75%;" />
+<img src="../img/Get_Jwt_Token.png" alt="Get_Jwt_Token" style="zoom:75%;" />
 
 Todos los servicios implementados esperan un token en el header de la solicitud, por lo que se debe incluir el token obtenido del componente jwt. Para incluir el token en la solicitud, siga los siguientes pasos 1 a 10 descritos anteriormente y antes de ejecutar el paso 11 haga clic en la opción Headers e incluya una nueva opción llamada Authorization y en la columna ubicada al frente incluya el token obtenido del componente jwt antecedido de la palabra Bearer más un espacio en blanco como se se muestra en la siguiente imagen:
 
-<img src="https://github.com/ci-cortesg/fotoalpes-microservices-examples/blob/main/img/Include_Token.png" alt="Include_Token" style="zoom:75%;" />
+<img src="../img/Include_Token.png" alt="Include_Token" style="zoom:75%;" />
 
 ## Descripción de los parámetros para las pruebas 
 

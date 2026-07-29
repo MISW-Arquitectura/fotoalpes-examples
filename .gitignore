@@ -130,3 +130,7 @@ dmypy.json
 .docker*
 # db files
 *.db
+
+# Datos de redis de versiones antiguas del compose (ahora se usa un volumen
+# nombrado, pero clones viejos pueden tener este directorio)
+data/

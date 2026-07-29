@@ -17,10 +17,11 @@ class ProductListResource(Resource):
         q.enqueue(send_product, product_schema.dump(new_product))
         return product_schema.dump(new_product)
 
+
 class ProductResource(Resource):
-    
+
     def put(self, product_id):
-        product = Product.query.get_or_404(product_id)
+        product = db.get_or_404(Product, product_id)
         if 'name' in request.json:
             product.name = request.json['name']
         if 'description' in request.json:
@@ -32,8 +33,6 @@ class ProductResource(Resource):
         db.session.commit()
         q.enqueue(put_product, product_schema.dump(product))
         return product_schema.dump(product)
-
-
 
 
 api.add_resource(ProductListResource, '/api-commands/products')
