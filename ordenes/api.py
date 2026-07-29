@@ -25,7 +25,19 @@ class OrderListResource(Resource):
             q.enqueue(process_order, new_order.id)
             return order_schema.dump(new_order)
         else:
-            return {"error": "The product or the user dont exist"}, 400
+            # Se indica cual de los dos falta: el mensaje generico anterior
+            # obligaba a adivinar.
+            faltantes = []
+            if user.status_code != 200:
+                faltantes.append("el usuario " + str(request.json['user']))
+            if product.status_code != 200:
+                faltantes.append("el producto " + str(request.json['product']))
+
+            return {
+                "error": "No existe " + " ni ".join(faltantes) + ".",
+                "sugerencia": "Cree primero el usuario y el producto, y use los ids "
+                              "que devuelven esas operaciones.",
+            }, 400
 
 
 class OrderResource(Resource):

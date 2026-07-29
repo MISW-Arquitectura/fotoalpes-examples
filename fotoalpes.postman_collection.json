@@ -1,0 +1,330 @@
+{
+  "info": {
+    "name": "Foto Alpes - sync",
+    "description": "Coleccion para probar el ejemplo Foto Alpes, rama `sync`.\n\nComo usarla:\n\n1. Levante los servicios con `docker compose up -d --build --wait`.\n2. Ejecute las peticiones en el orden de las carpetas.\n\nLos ids de usuario, producto y orden se guardan solos al crearlos, \nasi que no tiene que copiarlos a mano.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Usuarios",
+      "item": [
+        {
+          "name": "Crear usuario",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users"
+              ]
+            },
+            "description": "Guarda el id en la variable 'userId'.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"ana\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Guarda el id devuelto para que las demas peticiones lo usen.",
+                  "if (pm.response.code === 200) {",
+                  "    const datos = pm.response.json();",
+                  "    if (datos.id) {",
+                  "        pm.collectionVariables.set('userId', datos.id);",
+                  "        console.log('userId = ' + datos.id');",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar usuarios",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Consultar usuario",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{userId}}"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Productos",
+      "item": [
+        {
+          "name": "Crear producto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ]
+            },
+            "description": "Guarda el id en la variable 'productId'.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Camara\",\n    \"description\": \"Camara de prueba\",\n    \"value\": 1500,\n    \"stock\": 100\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Guarda el id devuelto para que las demas peticiones lo usen.",
+                  "if (pm.response.code === 200) {",
+                  "    const datos = pm.response.json();",
+                  "    if (datos.id) {",
+                  "        pm.collectionVariables.set('productId', datos.id);",
+                  "        console.log('productId = ' + datos.id');",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar productos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Consultar producto",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "{{productId}}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Modificar producto",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "{{productId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Camara\",\n    \"description\": \"Camara de prueba modificada\",\n    \"value\": 1800,\n    \"stock\": 500\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Ordenes",
+      "item": [
+        {
+          "name": "Crear orden",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders"
+              ]
+            },
+            "description": "El servicio valida de forma sincrona que el usuario y el producto existan, consultando por HTTP a los otros dos servicios.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"user\": {{userId}},\n    \"product\": {{productId}},\n    \"quantity\": 10\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Guarda el id de la orden creada.",
+                  "if (pm.response.code === 200) {",
+                  "    const datos = pm.response.json();",
+                  "    if (datos.id) {",
+                  "        pm.collectionVariables.set('orderId', datos.id);",
+                  "        console.log('orderId = ' + datos.id);",
+                  "    }",
+                  "}",
+                  "if (pm.response.code === 400) {",
+                  "    console.log('400: el usuario o el producto no existen. Ejecute primero');",
+                  "    console.log('\"Crear usuario\" y \"Crear producto\".');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar ordenes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Consultar orden",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{orderId}}"
+              ]
+            },
+            "description": "La orden se crea en 'processing'. Vuelva a enviar esta peticion unos segundos despues para verla en 'completed' o 'failed'."
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000"
+    },
+    {
+      "key": "userId",
+      "value": "1"
+    },
+    {
+      "key": "productId",
+      "value": "1"
+    },
+    {
+      "key": "orderId",
+      "value": "1"
+    }
+  ]
+}
