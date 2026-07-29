@@ -236,10 +236,23 @@ else:
 # Verifica la rama 'else' de process_order: si no hay stock suficiente la orden
 # debe quedar en 'failed' y el stock no debe moverse.
 print("\n[7/7] Verificar que una orden sin stock suficiente queda en 'failed'")
+# El paso anterior dejo un descuento de stock en vuelo (la orden se completa
+# antes de que el worker actualice la BD de productos). Esperamos a que se
+# estabilice antes de tomar la medida de referencia, o compararíamos contra un
+# valor que todavia iba a cambiar.
+estabilizado = STOCK_NUEVO - CANTIDAD_GRANDE
+limite = time.time() + TIMEOUT_ESPERA
 stock_antes = None
-codigo, actual = pedir("GET", "/api-queries/products/" + str(producto["id"]), token=token)
-if isinstance(actual, dict):
-    stock_antes = actual.get("stock")
+while time.time() < limite:
+    codigo, actual = pedir("GET", "/api-queries/products/" + str(producto["id"]), token=token)
+    stock_antes = actual.get("stock") if isinstance(actual, dict) else None
+    if stock_antes == estabilizado:
+        break
+    time.sleep(1)
+
+if stock_antes != estabilizado:
+    fallo("el stock no se estabilizo en " + str(estabilizado)
+          + " antes de la prueba de orden rechazada (quedo en " + str(stock_antes) + ")")
 
 codigo, orden3 = pedir("POST", "/api-commands/orders", {
     "user": usuario["id"],
