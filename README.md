@@ -26,6 +26,8 @@ Verifique con `docker compose version`.
 docker compose up -d --build --wait
 ```
 
+> **La primera vez tarda varios minutos.** Docker descarga la imagen base de Python e instala las dependencias de cada servicio. Aunque la terminal parezca detenida, está compilando: no la interrumpa. Las siguientes ejecuciones son casi inmediatas gracias a la caché.
+
 Los servicios quedan expuestos a través del API Gateway en **https://localhost:5000** (note el **https**).
 
 Para detener todo y borrar los datos:
@@ -133,7 +135,7 @@ Cuerpos de las peticiones:
 >
 > El usuario y el producto deben existir **en la base de datos del servicio de órdenes**, donde llegan por replicación asíncrona. Si crea una orden inmediatamente después de crear el usuario, puede recibir un 400: espere un momento y reintente.
 
-En [POSTMAN.md](POSTMAN.md) está el paso a paso de Postman con capturas, incluido cómo enviar el token en la cabecera `Authorization`.
+**Con Postman:** importe el archivo [`fotoalpes.postman_collection.json`](fotoalpes.postman_collection.json) que viene en el repositorio y tendrá todas las operaciones listas. Ejecute primero `Obtener token`: queda guardado y las demás peticiones lo envían solas, igual que los ids de usuario, producto y orden. En [POSTMAN.md](POSTMAN.md) está el paso a paso con capturas.
 
 ## Descripción de los componentes
 

@@ -20,7 +20,24 @@ class OrderListResource(Resource):
             q.enqueue(process_order, new_order.id)
             return order_schema.dump(new_order)
         else:
-            return {"error": "The product or the user dont exist"}, 400
+            # Se indica cual de los dos falta: el mensaje generico anterior
+            # obligaba a adivinar, y en esta rama la causa mas comun no es que
+            # el dato no exista sino que la replicacion aun no ha llegado.
+            faltantes = []
+            if user is None:
+                faltantes.append("el usuario " + str(request.json['user']))
+            if product is None:
+                faltantes.append("el producto " + str(request.json['product']))
+
+            return {
+                "error": "No se encontro " + " ni ".join(faltantes)
+                         + " en la base de datos del servicio de ordenes.",
+                "sugerencia": "Los usuarios y productos llegan a este servicio por "
+                              "replicacion asincrona. Si acaba de crearlos, espere "
+                              "unos segundos y reintente. Si el problema persiste, "
+                              "revise que el worker este corriendo con "
+                              "'docker compose ps'.",
+            }, 400
 
 
 api.add_resource(OrderListResource, '/api-commands/orders')

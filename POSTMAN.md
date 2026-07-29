@@ -4,6 +4,26 @@ Guía para consumir los servicios del ejemplo Foto Alpes desde [Postman](https:/
 
 > **Alternativa rápida:** si solo quiere comprobar que todo funciona, no necesita Postman. Ejecute `python3 smoke_test.py`, que recorre el flujo completo automáticamente. Postman es útil cuando quiere explorar los servicios operación por operación.
 
+## La forma rápida: importar la colección
+
+El repositorio incluye **`fotoalpes.postman_collection.json`**, una colección lista con todas las operaciones de esta rama. Importarla le ahorra escribir a mano una decena de URLs y evita los errores de tipeo, que son la causa más común de "no me funciona".
+
+1. Levante los servicios: `docker compose up -d --build --wait`
+2. En Postman haga clic en **Import**
+3. Arrastre el archivo `fotoalpes.postman_collection.json` o selecciónelo con **Upload Files**
+4. Ejecute las peticiones en el orden en que aparecen las carpetas
+
+La colección trae dos comodidades:
+
+- **Los ids se guardan solos.** Al crear un usuario, su id queda en la variable `userId` y las siguientes peticiones lo usan automáticamente. Lo mismo con `productId` y `orderId`. No tiene que copiar nada a mano.
+- **El token también** (ramas de seguridad). Ejecute `Obtener token` una vez y las demás peticiones lo envían solas en la cabecera `Authorization`.
+
+Si cambió el puerto o corre los servicios en otra máquina, ajuste la variable `baseUrl` de la colección.
+
+> En las ramas `sync-sec` y `async-sec` **igual debe desactivar la verificación del certificado** en Postman: es un ajuste de la aplicación y no puede venir dentro de la colección. Vea la sección siguiente.
+
+El resto de esta guía explica cómo hacerlo todo a mano, por si prefiere construir las peticiones paso a paso.
+
 ## Antes de empezar
 
 Levante los servicios:
