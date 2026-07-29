@@ -134,7 +134,7 @@ Cuerpos de las peticiones:
 
 > La orden se crea en estado `processing` y un worker la procesa. Consúltela unos segundos después para verla en `completed` o `failed`.
 
-En `vm/README.md` de la rama `main` está el paso a paso de Postman con capturas.
+En [POSTMAN.md](POSTMAN.md) está el paso a paso de Postman con capturas, incluido cómo enviar el token en la cabecera `Authorization`.
 
 ## Descripción de los componentes
 
