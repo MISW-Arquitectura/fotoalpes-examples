@@ -5,8 +5,9 @@ Verifica el camino completo con CQRS, comunicacion asincrona y seguridad:
 obtener un token del componente jwt, comprobar que los servicios rechazan las
 peticiones sin token, crear usuario y producto, esperar a que el worker los
 replique en la BD de ordenes, crear una orden, comprobar que el procesamiento
-asincrono la completo y descontó el stock, y modificar el producto para
-verificar que la replica se actualiza.
+asincrono la completo y descontó el stock, modificar el producto para verificar
+que la replica se actualiza, y comprobar que una orden por encima del stock
+disponible queda en 'failed'.
 
 Todo el trafico va por HTTPS con un certificado autofirmado, por lo que la
 verificacion del certificado se desactiva a proposito.
@@ -69,7 +70,7 @@ def fallo(mensaje):
 print("Probando " + BASE)
 
 # ------------------------------------------------------------------- jwt
-print("\n[1/6] Obtener token del componente jwt")
+print("\n[1/7] Obtener token del componente jwt")
 codigo, respuesta = pedir("GET", "/api-queries/jwt")
 token = respuesta.get("access_token") if isinstance(respuesta, dict) else None
 if codigo == 200 and token:
@@ -80,7 +81,7 @@ else:
     sys.exit(1)
 
 # ------------------------------------------------------------- seguridad
-print("\n[2/6] Verificar que los servicios exigen token")
+print("\n[2/7] Verificar que los servicios exigen token")
 codigo, _ = pedir("GET", "/api-queries/users")
 if codigo == 401:
     ok("sin token, /api-queries/users responde 401 como se espera")
@@ -88,7 +89,7 @@ else:
     fallo("sin token se esperaba 401 pero respondio " + str(codigo))
 
 # ---------------------------------------------------------------- usuarios
-print("\n[3/6] Crear usuario")
+print("\n[3/7] Crear usuario")
 nombre = "estudiante_" + str(int(time.time()))
 codigo, usuario = pedir("POST", "/api-commands/users", {"username": nombre}, token=token)
 if codigo == 200 and isinstance(usuario, dict) and usuario.get("id"):
@@ -105,7 +106,7 @@ else:
     fallo("el usuario no aparece en /api-queries/users")
 
 # --------------------------------------------------------------- productos
-print("\n[4/6] Crear producto")
+print("\n[4/7] Crear producto")
 codigo, producto = pedir("POST", "/api-commands/products", {
     "name": "Camara",
     "description": "Camara de prueba",
@@ -122,7 +123,7 @@ else:
 # ------------------------------------------------- replicacion asincrona
 # El servicio de ordenes solo acepta la orden cuando el worker ya replico el
 # usuario y el producto en su propia BD, asi que reintentamos hasta lograrlo.
-print("\n[5/6] Esperar replicacion, crear orden y verificar el descuento de stock")
+print("\n[5/7] Esperar replicacion, crear orden y verificar el descuento de stock")
 limite = time.time() + TIMEOUT_ESPERA
 orden = None
 while time.time() < limite:
@@ -184,7 +185,7 @@ else:
 # ordenes. Para comprobar que esa replica quedo actualizada creamos una segunda
 # orden por una cantidad que solo cabe en el stock nuevo: si la replica no se
 # hubiera actualizado, process_order la marcaria como 'failed'.
-print("\n[6/6] Modificar producto (PUT) y verificar que la replica se actualiza")
+print("\n[6/7] Modificar producto (PUT) y verificar que la replica se actualiza")
 STOCK_NUEVO = 500
 CANTIDAD_GRANDE = 200
 
@@ -230,6 +231,45 @@ else:
         fallo("orden rechazada por stock: put_product no actualizo la replica en ordenes")
     else:
         fallo("la segunda orden quedo en '" + str(estado2) + "'")
+
+# ------------------------------------------------------- orden rechazada
+# Verifica la rama 'else' de process_order: si no hay stock suficiente la orden
+# debe quedar en 'failed' y el stock no debe moverse.
+print("\n[7/7] Verificar que una orden sin stock suficiente queda en 'failed'")
+stock_antes = None
+codigo, actual = pedir("GET", "/api-queries/products/" + str(producto["id"]), token=token)
+if isinstance(actual, dict):
+    stock_antes = actual.get("stock")
+
+codigo, orden3 = pedir("POST", "/api-commands/orders", {
+    "user": usuario["id"],
+    "product": producto["id"],
+    "quantity": STOCK_NUEVO * 10,
+}, token=token)
+if codigo == 200 and isinstance(orden3, dict) and orden3.get("id"):
+    limite = time.time() + TIMEOUT_ESPERA
+    estado3 = None
+    while time.time() < limite:
+        codigo, actual = pedir("GET", "/api-queries/orders/" + str(orden3["id"]), token=token)
+        estado3 = actual.get("state") if isinstance(actual, dict) else None
+        if estado3 in ("completed", "failed"):
+            break
+        time.sleep(1)
+
+    if estado3 == "failed":
+        ok("la orden sin stock quedo correctamente en 'failed'")
+    else:
+        fallo("se esperaba 'failed' pero la orden quedo en '" + str(estado3) + "'")
+
+    codigo, actual = pedir("GET", "/api-queries/products/" + str(producto["id"]), token=token)
+    stock_final = actual.get("stock") if isinstance(actual, dict) else None
+    if stock_final == stock_antes:
+        ok("el stock no se modifico por la orden rechazada")
+    else:
+        fallo("el stock cambio de " + str(stock_antes) + " a " + str(stock_final)
+              + " tras una orden rechazada")
+else:
+    fallo("no se pudo crear la orden de prueba (HTTP " + str(codigo) + ")")
 
 # ------------------------------------------------------------- resultado
 print("")
