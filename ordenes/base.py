@@ -23,7 +23,16 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////mnt/ordenes.db'
+
+# CQRS: dos almacenes distintos.
+#
+#   - escritura: fuente de verdad. Solo lo toca api_commands.py.
+#   - lectura:   proyeccion derivada. Solo la lee api_queries.py.
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////mnt/ordenes-escritura.db'
+app.config['SQLALCHEMY_BINDS'] = {
+    'lectura': 'sqlite:////mnt/ordenes-lectura.db',
+}
+
 db = SQLAlchemy(app)
 ma = Marshmallow(app)
 app.config["JWT_SECRET_KEY"] = "secret-jwt"  # Change this!
@@ -70,13 +79,24 @@ def obtener_cola(servicio, cola, intentos=30, espera=2):
     sys.exit(1)
 
 
-# q  -> cola donde se publican las ordenes por procesar y las replicas
-# q2 -> cola donde se pide al servicio de productos que descuente el stock
+# q  -> ordenes por procesar y replicas que llegan de los otros servicios
+# q2 -> se pide al servicio de productos que descuente el stock
+# q_proyeccion -> proyecta las ordenes hacia el modelo de lectura
 q = Queue(connection=Redis(host='redis', port=6379, db=obtener_cola("orders", "q")))
 q2 = Queue(connection=Redis(host='redis', port=6379, db=obtener_cola("orders", "q2")))
+q_proyeccion = Queue(
+    connection=Redis(host='redis', port=6379, db=obtener_cola("orders", "proyeccion"))
+)
 
+
+# --------------------------------------------------------------- escritura
 
 class Order(db.Model):
+    """Modelo de ESCRITURA. Normalizado y minimo: solo lo necesario para
+    decidir si la orden es valida y en que estado esta."""
+
+    __tablename__ = 'order'
+
     id = db.Column(db.Integer, primary_key=True)
     user = db.Column(db.Integer)
     product = db.Column(db.Integer)
@@ -85,6 +105,11 @@ class Order(db.Model):
 
 
 class Product(db.Model):
+    """Replica local del producto, mantenida por la cola. El lado de escritura
+    la necesita para validar la orden y verificar el stock."""
+
+    __tablename__ = 'product'
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50))
     description = db.Column(db.String(200))
@@ -93,8 +118,40 @@ class Product(db.Model):
 
 
 class User(db.Model):
+    """Replica local del usuario, mantenida por la cola."""
+
+    __tablename__ = 'user'
+
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True)
+
+
+# ----------------------------------------------------------------- lectura
+
+class OrderView(db.Model):
+    """Modelo de LECTURA, denormalizado.
+
+    Aqui se ve por que existe CQRS. El modelo de escritura guarda solo los ids
+    del usuario y del producto, que es lo que necesita para decidir. El de
+    lectura guarda ademas sus nombres, el valor unitario y el total ya
+    calculado, porque eso es lo que la consulta necesita responder.
+
+    Consecuencia: GET /api-queries/orders/<id> se resuelve leyendo UNA fila,
+    sin joins y sin llamar a ningun otro servicio.
+    """
+
+    __bind_key__ = 'lectura'
+    __tablename__ = 'order_view'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer)
+    user_username = db.Column(db.String(50))
+    product_id = db.Column(db.Integer)
+    product_name = db.Column(db.String(50))
+    product_value = db.Column(db.Integer)
+    quantity = db.Column(db.Integer)
+    total = db.Column(db.Integer)
+    state = db.Column(db.String(100))
 
 
 class OrderSchema(ma.SQLAlchemyAutoSchema):
@@ -105,13 +162,26 @@ class OrderSchema(ma.SQLAlchemyAutoSchema):
         fields = ("id", "user", "product", "quantity", "state")
 
 
+class OrderViewSchema(ma.SQLAlchemyAutoSchema):
+    class Meta:
+        model = OrderView
+        fields = ("id", "user_id", "user_username", "product_id",
+                  "product_name", "product_value", "quantity", "total", "state")
+
+
 order_schema = OrderSchema()
-orders_schema = OrderSchema(many=True)
+order_view_schema = OrderViewSchema()
+orders_view_schema = OrderViewSchema(many=True)
 
 
 def process_order(order_id):
     # Esta funcion la ejecuta el worker de RQ, fuera del ciclo de request,
     # por lo que necesita abrir su propio contexto de aplicacion.
+    #
+    # El import es tardio a proposito: proyector.py importa este modulo, asi
+    # que importarlo arriba crearia un ciclo.
+    from proyector import proyectar_orden
+
     with app.app_context():
         order = db.session.get(Order, order_id)
         product = db.session.get(Product, order.product)
@@ -125,3 +195,7 @@ def process_order(order_id):
         else:
             order.state = "failed"
         db.session.commit()
+
+        # El estado cambio en el modelo de escritura: hay que volver a
+        # proyectar para que las consultas lo reflejen.
+        q_proyeccion.enqueue(proyectar_orden, order.id)

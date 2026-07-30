@@ -1,19 +1,21 @@
-from base import app, api, ma, db, Order, order_schema, orders_schema, q, process_order, Resource, Flask, request, jsonify
+from base import app, api, ma, db, OrderView, order_view_schema, orders_view_schema, Resource, Flask, request, jsonify
 from flask_jwt_extended import jwt_required
 
 
 class OrderListResource(Resource):
     @jwt_required()
     def get(self):
-        orders = db.session.scalars(db.select(Order)).all()
-        return orders_schema.dump(orders)
+        # El lado de consultas lee UNICAMENTE del modelo de lectura, que ya
+        # trae los nombres y el total resueltos.
+        orders = db.session.scalars(db.select(OrderView)).all()
+        return orders_view_schema.dump(orders)
 
 
 class OrderResource(Resource):
     @jwt_required()
     def get(self, order_id):
-        order = db.get_or_404(Order, order_id)
-        return order_schema.dump(order)
+        order = db.get_or_404(OrderView, order_id)
+        return order_view_schema.dump(order)
 
 
 api.add_resource(OrderListResource, '/api-queries/orders')

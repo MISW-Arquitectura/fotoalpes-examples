@@ -103,24 +103,41 @@ services:
     healthcheck: *healthcheck-puerto
     depends_on: *depende-de-seguridad
 
-  # worker-orders atiende la cola 0: procesa las ordenes y replica en la BD de
-  # ordenes los usuarios y productos creados por los otros servicios.
+  # worker-orders atiende la cola 0: procesa las ordenes, replica en la BD de
+  # ordenes los usuarios y productos creados por los otros servicios, y
+  # proyecta las ordenes hacia el modelo de lectura.
   worker-orders:
     build: ./ordenes
     volumes:
       - ./ordenes/:/mnt/
     working_dir: /backend/
     command: rq worker -u 'redis://redis/0'
+    environment:
+      RETRASO_PROYECCION: ${RETRASO_PROYECCION:-0}
     depends_on: *depende-de-seguridad
 
   # worker-products atiende la cola 1: descuenta el stock en la BD de
-  # productos cuando el servicio de ordenes lo solicita.
+  # productos y proyecta los productos hacia su modelo de lectura.
   worker-products:
     build: ./productos
     volumes:
       - ./productos/:/mnt/
     working_dir: /backend/
     command: rq worker -u 'redis://redis/1'
+    environment:
+      RETRASO_PROYECCION: ${RETRASO_PROYECCION:-0}
+    depends_on: *depende-de-seguridad
+
+  # worker-users atiende la cola 2: proyecta los usuarios hacia el modelo de
+  # lectura del propio servicio de usuarios.
+  worker-users:
+    build: ./usuarios
+    volumes:
+      - ./usuarios/:/mnt/
+    working_dir: /backend/
+    command: rq worker -u 'redis://redis/2'
+    environment:
+      RETRASO_PROYECCION: ${RETRASO_PROYECCION:-0}
     depends_on: *depende-de-seguridad
 
   nginx:

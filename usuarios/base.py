@@ -20,7 +20,19 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////mnt/usuarios.db'
+
+# CQRS: dos almacenes distintos.
+#
+#   - escritura: fuente de verdad. Solo lo toca api_commands.py.
+#   - lectura:   proyeccion derivada. Solo la lee api_queries.py.
+#
+# La proyeccion es desechable: se puede borrar y regenerar en cualquier momento
+# a partir del almacen de escritura (ver reconstruir_proyeccion.py).
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////mnt/usuarios-escritura.db'
+app.config['SQLALCHEMY_BINDS'] = {
+    'lectura': 'sqlite:////mnt/usuarios-lectura.db',
+}
+
 db = SQLAlchemy(app)
 ma = Marshmallow(app)
 app.config["JWT_SECRET_KEY"] = "secret-jwt"  # Change this!
@@ -67,12 +79,40 @@ def obtener_cola(servicio, cola, intentos=30, espera=2):
     sys.exit(1)
 
 
+# Replica el usuario hacia el servicio de ordenes, que necesita conocerlo para
+# validar. La atiende worker-orders.
 q = Queue(connection=Redis(host='redis', port=6379, db=obtener_cola("users", "q")))
+
+# Proyecta el usuario hacia el modelo de lectura de este servicio. La atiende
+# worker-users, que corre esta misma imagen. Igual que las demas, la cola la
+# autoriza el ACL.
+q_proyeccion = Queue(
+    connection=Redis(host='redis', port=6379, db=obtener_cola("users", "proyeccion"))
+)
 
 
 class User(db.Model):
+    """Modelo de ESCRITURA. Es la fuente de verdad."""
+
+    __tablename__ = 'user'
+
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True)
+
+
+class UserView(db.Model):
+    """Modelo de LECTURA. Proyeccion derivada del modelo de escritura.
+
+    Para usuarios la forma es casi identica a la de escritura, porque la
+    consulta no necesita nada mas. La diferencia se aprecia en el servicio de
+    ordenes, donde el modelo de lectura si tiene otra forma.
+    """
+
+    __bind_key__ = 'lectura'
+    __tablename__ = 'user_view'
+
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(50))
 
 
 class UserSchema(ma.SQLAlchemyAutoSchema):
@@ -83,5 +123,12 @@ class UserSchema(ma.SQLAlchemyAutoSchema):
         fields = ("id", "username")
 
 
+class UserViewSchema(ma.SQLAlchemyAutoSchema):
+    class Meta:
+        model = UserView
+        fields = ("id", "username")
+
+
 user_schema = UserSchema()
-users_schema = UserSchema(many=True)
+user_view_schema = UserViewSchema()
+users_view_schema = UserViewSchema(many=True)
